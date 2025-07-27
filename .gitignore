@@ -1,0 +1,32 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# PyInstaller
+build/
+dist/
+/backend/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Electron-builder
+release-builds/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# User-specific files
+/downloads/
+NOTE_DEPLOYMENT.md
+
+# OS generated files
+.DS_Store
+Thumbs.db 

@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Generatore Bollettini</title>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self'; style-src 'self' 'unsafe-inline';">
+    <style>
+        :root {
+            --bg-color-deep: #202020;
+            --bg-color-surface: rgba(44, 44, 44, 0.85);
+            --accent-color: #0078d4;
+            --accent-color-hover: #108ee9;
+            --text-color: #ffffff;
+            --text-color-secondary: #cccccc;
+            --border-color: rgba(255, 255, 255, 0.1);
+        }
+        @keyframes gradient-animation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            color: var(--text-color);
+            background: linear-gradient(-45deg, #2b5876, #4e4376);
+            background-size: 400% 400%;
+            animation: gradient-animation 25s ease infinite;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+            overflow: hidden;
+        }
+        .title-bar {
+            -webkit-app-region: drag;
+            height: 40px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            padding-left: 15px;
+            font-size: 0.8em;
+            color: var(--text-color-secondary);
+        }
+        .title-bar img {
+            height: 24px;
+            width: auto;
+        }
+        .container {
+            width: 80%; max-width: 550px; padding: 40px;
+            background-color: var(--bg-color-surface);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            transition: all 0.4s ease;
+            display: grid;
+            place-items: center;
+        }
+        .view {
+            grid-column: 1;
+            grid-row: 1;
+            width: 100%;
+            transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(15px) scale(0.98);
+        }
+        h1 { color: var(--text-color); font-weight: 600; }
+        h2 { color: var(--accent-color); font-weight: 500;}
+        p { color: var(--text-color-secondary); }
+        button {
+            background-color: var(--accent-color); color: white; border: none;
+            padding: 12px 24px; border-radius: 8px; font-size: 1em;
+            cursor: pointer; transition: background-color 0.2s, transform 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        button:hover { background-color: var(--accent-color-hover); transform: translateY(-2px); }
+        progress {
+            width: 100%; height: 8px; appearance: none; -webkit-appearance: none;
+            border: none; border-radius: 4px; overflow: hidden;
+        }
+        progress::-webkit-progress-bar { background-color: rgba(0, 0, 0, 0.3); }
+        progress::-webkit-progress-value { background-color: var(--accent-color); transition: width 0.3s ease; }
+        #captcha-image { margin: 20px 0; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        input[type="text"] {
+            width: 70%; padding: 12px; margin-top: 10px; border-radius: 8px;
+            border: 1px solid var(--border-color); background-color: var(--bg-color-deep);
+            color: var(--text-color); font-size: 1.1em; text-align: center;
+        }
+        input[type="text"]:focus { border-color: var(--accent-color); outline: none; }
+        
+        /* Fluent Input */
+        .fluent-input-container {
+            position: relative;
+            margin-top: 40px;
+            width: 280px;
+        }
+        .fluent-input-container input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--text-color-secondary);
+            padding: 10px 0;
+            font-size: 18px;
+            color: var(--text-color);
+            outline: none;
+        }
+        .fluent-input-container label {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            color: var(--text-color-secondary);
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+        .fluent-input-container .focus-border {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background-color: var(--accent-color);
+            transition: all 0.4s ease;
+        }
+        .fluent-input-container input:focus ~ .focus-border,
+        .fluent-input-container input:valid ~ .focus-border {
+            width: 100%;
+            left: 0;
+        }
+        .fluent-input-container input:focus ~ label,
+        .fluent-input-container input:valid ~ label {
+            top: -16px;
+            font-size: 14px;
+            color: var(--accent-color);
+        }
+        /* Remove Wave CSS */
+        /* .wave-group { ... } */
+        .loading-animation { animation: pulse 1.8s infinite ease-in-out; }
+        @keyframes pulse {
+            0% { opacity: 0.8; }
+            50% { opacity: 1; }
+            100% { opacity: 0.8; }
+        }
+        @keyframes pulse-start-button {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 120, 212, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 10px 15px rgba(0, 120, 212, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 120, 212, 0); }
+        }
+        .start-button-animation {
+            animation: pulse-start-button 2s infinite;
+        }
+        .pulse-animation {
+            animation: pulse-animation 2s infinite;
+            margin-top: 25px;
+        }
+        #back-arrow {
+            position: absolute;
+            top: 25px;
+            left: 25px;
+            cursor: pointer;
+            color: var(--text-color-secondary);
+            transition: transform 0.3s ease, color 0.3s ease, opacity 0.3s ease;
+            opacity: 0;
+            pointer-events: none;
+        }
+        #back-arrow.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        #back-arrow:hover {
+            transform: translateX(-5px);
+            color: var(--accent-color);
+        }
+
+        #captcha-view {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Fluent Input */
+        .fluent-input-container {
+            position: relative;
+            margin-top: 40px;
+            width: 280px;
+        }
+        .fluent-input-container input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid var(--text-color-secondary);
+            padding: 10px 0;
+            font-size: 18px;
+            color: var(--text-color);
+            outline: none;
+        }
+        .fluent-input-container label {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            color: var(--text-color-secondary);
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+        .fluent-input-container .focus-border {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background-color: var(--accent-color);
+            transition: all 0.4s ease;
+        }
+        .fluent-input-container input:focus ~ .focus-border,
+        .fluent-input-container input:valid ~ .focus-border {
+            width: 100%;
+            left: 0;
+        }
+        .fluent-input-container input:focus ~ label,
+        .fluent-input-container input:valid ~ label {
+            top: -16px;
+            font-size: 14px;
+            color: var(--accent-color);
+        }
+        /* Remove Wave CSS */
+        /* .wave-group { ... } */
+        .loading-animation { animation: pulse 1.8s infinite ease-in-out; }
+        @keyframes pulse {
+            0% { opacity: 0.8; }
+            50% { opacity: 1; }
+            100% { opacity: 0.8; }
+        }
+        @keyframes pulse-start-button {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 120, 212, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 10px 15px rgba(0, 120, 212, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 120, 212, 0); }
+        }
+        .start-button-animation {
+            animation: pulse-start-button 2s infinite;
+        }
+        #back-arrow {
+            position: absolute;
+            top: 25px;
+            left: 25px;
+            cursor: pointer;
+            color: var(--text-color-secondary);
+            transition: transform 0.3s ease, color 0.3s ease;
+        }
+        #back-arrow:hover {
+            transform: translateX(-5px);
+            color: var(--accent-color);
+        }
+        progress.task-progress-bar {
+            height: 4px;
+            margin-top: 5px;
+        }
+        .progress-group {
+            width: 100%;
+            text-align: left;
+        }
+        .progress-label-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 8px;
+        }
+        .progress-label {
+            font-size: 0.9em;
+            color: var(--text-color-secondary);
+        }
+        .progress-value {
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        #loading-animation-container {
+            margin-top: 40px;
+        }
+        .pl {
+            width: 5em;
+            height: 5em;
+        }
+        .pl__ring {
+            animation: ringA 2s linear infinite;
+        }
+        .pl__ring--a { stroke: #D40511; } /* DHL Red */
+        .pl__ring--b { animation-name: ringB; stroke: #FFCC00; } /* DHL Yellow */
+        .pl__ring--c { animation-name: ringC; stroke: #D40511; } /* DHL Red */
+        .pl__ring--d { animation-name: ringD; stroke: #FFCC00; } /* DHL Yellow */
+
+        /* Animations */
+        @keyframes ringA { from, 4% { stroke-dasharray: 0 660; stroke-width: 20; stroke-dashoffset: -330; } 12% { stroke-dasharray: 60 600; stroke-width: 30; stroke-dashoffset: -335; } 32% { stroke-dasharray: 60 600; stroke-width: 30; stroke-dashoffset: -595; } 40%, 54% { stroke-dasharray: 0 660; stroke-width: 20; stroke-dashoffset: -660; } 62% { stroke-dasharray: 60 600; stroke-width: 30; stroke-dashoffset: -665; } 82% { stroke-dasharray: 60 600; stroke-width: 30; stroke-dashoffset: -925; } 90%, to { stroke-dasharray: 0 660; stroke-width: 20; stroke-dashoffset: -990; } }
+        @keyframes ringB { from, 12% { stroke-dasharray: 0 220; stroke-width: 20; stroke-dashoffset: -110; } 20% { stroke-dasharray: 20 200; stroke-width: 30; stroke-dashoffset: -115; } 40% { stroke-dasharray: 20 200; stroke-width: 30; stroke-dashoffset: -195; } 48%, 62% { stroke-dasharray: 0 220; stroke-width: 20; stroke-dashoffset: -220; } 70% { stroke-dasharray: 20 200; stroke-width: 30; stroke-dashoffset: -225; } 90% { stroke-dasharray: 20 200; stroke-width: 30; stroke-dashoffset: -305; } 98%, to { stroke-dasharray: 0 220; stroke-width: 20; stroke-dashoffset: -330; } }
+        @keyframes ringC { from { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: 0; } 8% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -5; } 28% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -175; } 36%, 58% { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: -220; } 66% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -225; } 86% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -395; } 94%, to { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: -440; } }
+        @keyframes ringD { from, 8% { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: 0; } 16% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -5; } 36% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -175; } 44%, 50% { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: -220; } 58% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -225; } 78% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -395; } 86%, to { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: -440; } }
+    </style>
+</head>
+<body>
+    <div class="title-bar">
+        <img src="logost.png" alt="Logo">
+    </div>
+    <div class="container">
+        <div id="back-arrow" title="Torna indietro">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        </div>
+        <!-- Schermata Iniziale -->
+        <div id="initial-view" class="view">
+            <h1>Generatore Bollettini</h1>
+            <p>Seleziona un file Excel per avviare il processo di automazione.</p>
+            <button id="select-file-btn" class="pulse-animation">
+                <img src="excel.png" alt="Excel Icon" width="24" height="24">
+                <span>Seleziona File</span>
+            </button>
+            <p id="file-path" style="color: var(--text-color-secondary); font-size: 0.8em; margin-top: 20px; min-height: 1.2em;"></p>
+        </div>
+
+        <!-- Schermata di Conferma -->
+        <div id="confirm-view" class="view hidden">
+            <h2 id="confirm-status"></h2>
+            <p>Sei pronto per iniziare l'elaborazione?</p>
+            <button id="start-btn" class="pulse-animation">
+                <img src="start.png" alt="Start Icon" width="24" height="24">
+                <span>Avvia Elaborazione</span>
+            </button>
+        </div>
+
+        <!-- Schermata di Avanzamento -->
+        <div id="progress-view" class="view hidden">
+            <div class="progress-group">
+                <div class="progress-label-container">
+                    <span class="progress-label">Stato Generale</span>
+                    <span id="main-status" class="progress-value">Inizializzazione...</span>
+                </div>
+                <progress id="global-progress" value="0" max="100"></progress>
+            </div>
+        
+            <div class="progress-group" style="margin-top: 25px;">
+                <div class="progress-label-container">
+                    <span class="progress-label">Dettaglio Operazione</span>
+                    <span id="current-task" class="progress-value">In attesa...</span>
+                </div>
+                <progress id="task-progress" value="0" max="100" class="task-progress-bar"></progress>
+            </div>
+            <div id="loading-animation-container" class="hidden">
+                <svg class="pl" width="240" height="240" viewBox="0 0 240 240">
+                    <circle class="pl__ring pl__ring--a" cx="120" cy="120" r="105" fill="none" stroke="#000" stroke-width="20" stroke-dasharray="0 660" stroke-dashoffset="-330" stroke-linecap="round"></circle>
+                    <circle class="pl__ring pl__ring--b" cx="120" cy="120" r="35" fill="none" stroke="#000" stroke-width="20" stroke-dasharray="0 220" stroke-dashoffset="-110" stroke-linecap="round"></circle>
+                    <circle class="pl__ring pl__ring--c" cx="85" cy="120" r="70" fill="none" stroke="#000" stroke-width="20" stroke-dasharray="0 440" stroke-linecap="round"></circle>
+                    <circle class="pl__ring pl__ring--d" cx="155" cy="120" r="70" fill="none" stroke="#000" stroke-width="20" stroke-dasharray="0 440" stroke-linecap="round"></circle>
+                </svg>
+            </div>
+        </div>
+        
+        <!-- Schermata CAPTCHA -->
+        <div id="captcha-view" class="view hidden">
+            <h2>Inserisci il Codice</h2>
+            <img id="captcha-image" src="" alt="Immagine CAPTCHA" />
+            <br>
+            <div class="fluent-input-container">
+                <input id="captcha-input" type="text" required autocomplete="off">
+                <label for="captcha-input">Scrivi qui il codice...</label>
+                <span class="focus-border"></span>
+            </div>
+        </div>
+
+        <!-- Area Notifiche/Errori -->
+        <div id="error-log" style="color: #f87171; margin-top: 20px; min-height: 1.5em;"></div>
+    </div>
+    
+    <script src="./renderer.js"></script>
+</body>
+</html> 
