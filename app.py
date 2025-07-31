@@ -1,3 +1,19 @@
+# =============================================================================
+# ATTENZIONE: SCRIPT DI TEST E SVILUPPO
+# =============================================================================
+# Questo script è uno strumento di utilità per testare la logica di
+# automazione in modo isolato, senza avviare l'intera applicazione Electron.
+#
+# Caratteristiche principali:
+# - Esegue l'automazione per un singolo bollettino.
+# - Non legge da un file Excel, ma chiede l'input tramite una GUI dedicata.
+# - È utile per il debug rapido (es. eseguendolo con headless=False).
+#
+# Questo file NON viene utilizzato nell'applicazione finale distribuita.
+# L'applicazione Electron utilizza esclusivamente `backend.py`.
+# =============================================================================
+
+
 import configparser
 import sys
 from playwright.sync_api import sync_playwright, TimeoutError, Page
