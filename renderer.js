@@ -23,6 +23,24 @@ const captchaInput = document.getElementById('captcha-input');
 const errorLog = document.getElementById('error-log');
 const loadingAnimation = document.getElementById('loading-animation-container');
 
+// Elementi per aggiornamenti
+const updateNotification = document.getElementById('update-notification');
+const updateInfo = document.getElementById('update-info');
+const updateProgressContainer = document.getElementById('update-progress-container');
+const updateProgress = document.getElementById('update-progress');
+const updateProgressText = document.getElementById('update-progress-text');
+const installUpdateBtn = document.getElementById('install-update-btn');
+const dismissUpdateBtn = document.getElementById('dismiss-update-btn');
+
+// Elementi per download backend
+const backendDownloadNotification = document.getElementById('backend-download-notification');
+const backendDownloadInfo = document.getElementById('backend-download-info');
+const backendDownloadProgressContainer = document.getElementById('backend-download-progress-container');
+const backendDownloadProgress = document.getElementById('backend-download-progress');
+const backendDownloadProgressText = document.getElementById('backend-download-progress-text');
+const downloadBackendBtn = document.getElementById('download-backend-btn');
+const dismissBackendBtn = document.getElementById('dismiss-backend-btn');
+
 let selectedFilePath = null;
 
 // Funzione per gestire il cambio di vista con animazioni
@@ -155,4 +173,146 @@ document.addEventListener('drop', (event) => {
             console.log(`File trascinato: ${filePath}. La selezione via pulsante è consigliata.`);
         }
     }
-}); 
+});
+
+// --- Gestione Aggiornamenti ---
+
+// Mostra notifica aggiornamento
+function showUpdateNotification(version) {
+    updateInfo.textContent = `È disponibile la versione ${version}. Vuoi scaricarla ora?`;
+    updateNotification.classList.remove('hidden');
+    updateProgressContainer.classList.add('hidden');
+    installUpdateBtn.classList.add('hidden');
+}
+
+// Nasconde notifica aggiornamento
+function hideUpdateNotification() {
+    updateNotification.classList.add('hidden');
+}
+
+// Mostra progresso download
+function showDownloadProgress(progress) {
+    updateProgressContainer.classList.remove('hidden');
+    updateProgress.value = Math.round(progress.percent);
+    updateProgressText.textContent = `${Math.round(progress.percent)}%`;
+}
+
+// Mostra pulsante installa
+function showInstallButton() {
+    installUpdateBtn.classList.remove('hidden');
+    updateProgressContainer.classList.add('hidden');
+}
+
+// Event listeners per aggiornamenti
+window.electronAPI.onUpdateAvailable((info) => {
+    console.log('Aggiornamento disponibile:', info.version);
+    showUpdateNotification(info.version);
+});
+
+window.electronAPI.onUpdateDownloaded((info) => {
+    console.log('Aggiornamento scaricato:', info.version);
+    showInstallButton();
+});
+
+window.electronAPI.onUpdateError((error) => {
+    console.error('Errore aggiornamento:', error);
+    errorLog.textContent = `Errore aggiornamento: ${error}`;
+});
+
+window.electronAPI.onUpdateDownloadProgress((progress) => {
+    console.log('Progresso download:', progress.percent);
+    showDownloadProgress(progress);
+});
+
+// Pulsanti aggiornamento
+installUpdateBtn.addEventListener('click', () => {
+    window.electronAPI.installUpdate();
+});
+
+dismissUpdateBtn.addEventListener('click', () => {
+    hideUpdateNotification();
+});
+
+// --- Gestione Download Backend ---
+
+// Mostra notifica download backend
+function showBackendDownloadNotification() {
+    backendDownloadNotification.classList.remove('hidden');
+    backendDownloadProgressContainer.classList.add('hidden');
+}
+
+// Nasconde notifica download backend
+function hideBackendDownloadNotification() {
+    backendDownloadNotification.classList.add('hidden');
+}
+
+// Mostra progresso download backend
+function showBackendDownloadProgress(progress) {
+    backendDownloadProgressContainer.classList.remove('hidden');
+    backendDownloadProgress.value = progress.progress;
+    backendDownloadProgressText.textContent = `${progress.progress}%`;
+    
+    const downloadedMB = (progress.downloadedSize / (1024 * 1024)).toFixed(1);
+    const totalMB = (progress.totalSize / (1024 * 1024)).toFixed(1);
+    backendDownloadInfo.textContent = `Scaricamento: ${downloadedMB}MB / ${totalMB}MB`;
+}
+
+// Event listeners per download backend
+window.electronAPI.onBackendDownloadStart(() => {
+    console.log('Inizio download backend');
+    showBackendDownloadNotification();
+    backendDownloadInfo.textContent = 'Inizio download...';
+});
+
+window.electronAPI.onBackendDownloadProgress((progress) => {
+    console.log('Progresso download backend:', progress);
+    showBackendDownloadProgress(progress);
+});
+
+window.electronAPI.onBackendDownloadComplete(() => {
+    console.log('Download backend completato');
+    backendDownloadInfo.textContent = 'Estrazione in corso...';
+});
+
+window.electronAPI.onBackendExtractStart(() => {
+    console.log('Inizio estrazione backend');
+    backendDownloadInfo.textContent = 'Estrazione componenti...';
+});
+
+window.electronAPI.onBackendExtractComplete(() => {
+    console.log('Estrazione backend completata');
+    backendDownloadInfo.textContent = 'Backend pronto!';
+    setTimeout(() => {
+        hideBackendDownloadNotification();
+    }, 2000);
+});
+
+window.electronAPI.onBackendReady(() => {
+    console.log('Backend pronto');
+    hideBackendDownloadNotification();
+});
+
+window.electronAPI.onBackendError((error) => {
+    console.error('Errore backend:', error);
+    backendDownloadInfo.textContent = `Errore: ${error}`;
+    errorLog.textContent = `Errore backend: ${error}`;
+});
+
+window.electronAPI.onBackendStatus((status) => {
+    console.log('Stato backend:', status);
+    if (!status.available) {
+        showBackendDownloadNotification();
+    }
+});
+
+// Pulsanti download backend
+downloadBackendBtn.addEventListener('click', () => {
+    window.electronAPI.downloadBackend();
+});
+
+dismissBackendBtn.addEventListener('click', () => {
+    hideBackendDownloadNotification();
+});
+
+// Controlla stato backend all'avvio
+window.electronAPI.checkBackend(); 

@@ -1,9 +1,0 @@
-[Credenziali]
-RAGIONE_SOCIALE = LA_TUA_RAGIONE_SOCIALE
-CODICE_FISCALE = IL_TUO_CODICE_FISCALE
-EMAIL = LA_TUA_EMAIL
-
-[Impostazioni]
-# Imposta headless = true per nascondere il browser durante l'esecuzione e renderla più veloce.
-# Imposta headless = false per visualizzare il browser (utile per il debug).
-HEADLESS = true 

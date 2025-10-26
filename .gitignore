@@ -17,6 +17,7 @@ yarn-error.log*
 
 # Electron-builder
 release-builds/
+dist/
 
 # Environment variables
 .env

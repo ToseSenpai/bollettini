@@ -7,14 +7,56 @@
     "start": "electron .",
     "clean-build": "rimraf build dist backend",
     "build-backend": "npm run clean-build && pyinstaller --noconfirm backend.spec --distpath ./backend && copy config.ini backend\\backend",
-    "dist": "npm run build-backend && electron-packager . generatore-bollettini --platform=win32 --arch=x64 --out=release-builds --overwrite --extra-resource=./backend",
+    "build-backend-zip": "npm run build-backend && powershell Compress-Archive -Path backend -DestinationPath backend.zip -Force",
+    "build": "electron-builder --win --publish never",
+    "build-full": "npm run build-backend && electron-builder --win --publish never",
+    "dist": "electron-builder --win --publish never",
+    "publish": "electron-builder --win --publish always",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "DHL Express Italy",
   "license": "ISC",
   "devDependencies": {
     "electron": "^31.2.1",
-    "electron-packager": "^17.1.2",
+    "electron-builder": "^25.1.8",
     "rimraf": "^6.0.1"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  },
+  "build": {
+    "appId": "com.dhl.generatore-bollettini",
+    "productName": "Generatore Bollettini",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer.js",
+      "index.html",
+      "logost.png",
+      "excel.png",
+      "start.png",
+      "config.ini",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "msi",
+      "artifactName": "${productName}-${version}-Setup.${ext}",
+      "icon": "logost.png"
+    },
+    "msi": {
+      "perMachine": false,
+      "oneClick": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "itose",
+      "repo": "bollettini",
+      "private": false
+    }
   }
 }
