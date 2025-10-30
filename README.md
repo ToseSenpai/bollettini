@@ -21,7 +21,7 @@
 
 ## 📖 Descrizione
 
-Generatore Bollettini è un'applicazione desktop che automatizza il processo di creazione di bollettini postali a partire da file Excel. L'applicazione combina un'interfaccia utente moderna costruita con Electron e un potente backend Python per l'elaborazione dei dati e la generazione dei documenti.
+Generatore Bollettini è un'applicazione desktop che automatizza il processo di creazione di bollettini sanitá a partire da file Excel. L'applicazione combina un'interfaccia utente moderna costruita con Electron e un potente backend Python per l'elaborazione dei dati e la generazione dei documenti.
 
 ### Architettura
 
