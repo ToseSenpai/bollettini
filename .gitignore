@@ -28,6 +28,30 @@ dist/
 /downloads/
 NOTE_DEPLOYMENT.md
 
+# Temporary documentation files
+CHECKLIST_*.md
+COME_*.md
+CONFRONTO_*.md
+INSTRUCTIONS_*.md
+ISTRUZIONI_*.md
+MODIFICHE_*.md
+PIANO_*.md
+RIEPILOGO_*.md
+SEMPLIFICAZIONE_*.md
+SOLUZIONE_*.md
+SPIEGAZIONE_*.md
+Riepilogo_*.md
+*.ps1
+
+# Backend artifacts
+# backend.zip is too large for git (1.3GB) - build locally before creating installer
+backend.zip
+
 # OS generated files
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# IDE and editor files
+.claude/
+.vscode/
+.idea/ 

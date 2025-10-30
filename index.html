@@ -74,6 +74,28 @@
             pointer-events: none;
             transform: translateY(15px) scale(0.98);
         }
+        .modal-dialog {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            background-color: var(--bg-color-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 450px;
+            z-index: 1001;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            transform: translate(-50%, -50%);
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .modal-dialog.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+        }
         h1 { color: var(--text-color); font-weight: 600; }
         h2 { color: var(--accent-color); font-weight: 500;}
         p { color: var(--text-color-secondary); }
@@ -304,6 +326,18 @@
         @keyframes ringB { from, 12% { stroke-dasharray: 0 220; stroke-width: 20; stroke-dashoffset: -110; } 20% { stroke-dasharray: 20 200; stroke-width: 30; stroke-dashoffset: -115; } 40% { stroke-dasharray: 20 200; stroke-width: 30; stroke-dashoffset: -195; } 48%, 62% { stroke-dasharray: 0 220; stroke-width: 20; stroke-dashoffset: -220; } 70% { stroke-dasharray: 20 200; stroke-width: 30; stroke-dashoffset: -225; } 90% { stroke-dasharray: 20 200; stroke-width: 30; stroke-dashoffset: -305; } 98%, to { stroke-dasharray: 0 220; stroke-width: 20; stroke-dashoffset: -330; } }
         @keyframes ringC { from { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: 0; } 8% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -5; } 28% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -175; } 36%, 58% { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: -220; } 66% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -225; } 86% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -395; } 94%, to { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: -440; } }
         @keyframes ringD { from, 8% { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: 0; } 16% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -5; } 36% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -175; } 44%, 50% { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: -220; } 58% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -225; } 78% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -395; } 86%, to { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: -440; } }
+        /* Version display */
+        .version-display {
+            position: fixed;
+            bottom: 10px;
+            right: 15px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.4);
+            font-family: 'Segoe UI', monospace;
+            z-index: 999;
+            user-select: none;
+            -webkit-user-select: none;
+        }
     </style>
 </head>
 <body>
@@ -378,40 +412,46 @@
         <div id="error-log" style="color: #f87171; margin-top: 20px; min-height: 1.5em;"></div>
         
         <!-- Notifica Aggiornamento -->
-        <div id="update-notification" class="view hidden" style="position: fixed; top: 50px; right: 20px; background-color: var(--bg-color-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; max-width: 300px; z-index: 1001;">
-            <h3 style="margin: 0 0 10px 0; color: var(--accent-color);">Aggiornamento Disponibile</h3>
-            <p id="update-info" style="margin: 0 0 15px 0; color: var(--text-color-secondary); font-size: 0.9em;"></p>
-            <div id="update-progress-container" class="hidden">
-                <div class="progress-label-container">
+        <div id="update-notification" class="modal-dialog hidden">
+            <h3 style="margin: 0 0 10px 0; color: var(--accent-color); font-size: 1.5em; text-align: center;">Aggiornamento Disponibile</h3>
+            <p id="update-info" style="margin: 0 0 20px 0; color: var(--text-color-secondary); font-size: 1em; text-align: center;"></p>
+            <div id="update-progress-container" class="hidden" style="margin-bottom: 20px;">
+                <div class="progress-label-container" style="margin-bottom: 8px;">
                     <span class="progress-label">Download</span>
                     <span id="update-progress-text" class="progress-value">0%</span>
                 </div>
-                <progress id="update-progress" value="0" max="100" style="width: 100%; height: 6px;"></progress>
+                <progress id="update-progress" value="0" max="100" style="width: 100%; height: 10px;"></progress>
             </div>
-            <div id="update-buttons" style="display: flex; gap: 10px; margin-top: 15px;">
-                <button id="install-update-btn" class="hidden" style="flex: 1; background-color: #28a745;">Installa e Riavvia</button>
-                <button id="dismiss-update-btn" style="flex: 1; background-color: #6c757d;">Più Tardi</button>
+            <div id="update-buttons" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                <button id="download-update-btn" style="width: 100%; background-color: var(--accent-color); padding: 14px;">Scarica Ora</button>
+                <button id="install-update-btn" class="hidden" style="width: 100%; background-color: #28a745; padding: 14px;">Installa e Riavvia</button>
             </div>
         </div>
         
         <!-- Notifica Download Backend -->
-        <div id="backend-download-notification" class="view hidden" style="position: fixed; top: 50px; left: 20px; background-color: var(--bg-color-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; max-width: 350px; z-index: 1001;">
-            <h3 style="margin: 0 0 10px 0; color: var(--accent-color);">Download Backend</h3>
-            <p id="backend-download-info" style="margin: 0 0 15px 0; color: var(--text-color-secondary); font-size: 0.9em;">Scaricamento componenti necessari...</p>
-            <div id="backend-download-progress-container" class="hidden">
-                <div class="progress-label-container">
+        <div id="backend-download-notification" class="modal-dialog hidden">
+            <h3 style="margin: 0 0 10px 0; color: var(--accent-color); font-size: 1.5em; text-align: center;">Download Backend</h3>
+            <p id="backend-download-info" style="margin: 0 0 20px 0; color: var(--text-color-secondary); font-size: 1em; text-align: center;">Scaricamento componenti necessari...</p>
+            <div id="backend-download-progress-container" style="margin-bottom: 20px;">
+                <div class="progress-label-container" style="margin-bottom: 8px;">
                     <span class="progress-label">Download</span>
                     <span id="backend-download-progress-text" class="progress-value">0%</span>
                 </div>
-                <progress id="backend-download-progress" value="0" max="100" style="width: 100%; height: 6px;"></progress>
+                <progress id="backend-download-progress" value="0" max="100" style="width: 100%; height: 10px;"></progress>
             </div>
-            <div id="backend-download-buttons" style="display: flex; gap: 10px; margin-top: 15px;">
-                <button id="download-backend-btn" style="flex: 1; background-color: var(--accent-color);">Scarica Ora</button>
-                <button id="dismiss-backend-btn" style="flex: 1; background-color: #6c757d;">Più Tardi</button>
+            <div id="backend-extract-progress-container" class="hidden" style="margin-bottom: 20px;">
+                <div class="progress-label-container" style="margin-bottom: 8px;">
+                    <span class="progress-label">Estrazione</span>
+                    <span id="backend-extract-progress-text" class="progress-value">In corso...</span>
+                </div>
+                <progress id="backend-extract-progress" value="0" max="100" style="width: 100%; height: 10px;"></progress>
             </div>
         </div>
     </div>
-    
+
+    <!-- Version display -->
+    <div class="version-display" id="app-version">v1.0.1</div>
+
     <script src="./renderer.js"></script>
 </body>
 </html> 

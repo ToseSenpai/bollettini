@@ -1,110 +1,132 @@
-# Generatore Bollettini
+# 📋 Generatore Bollettini
 
-Applicazione desktop per la generazione di bollettini.
+<div align="center">
 
-## Descrizione
+**Applicazione desktop automatizzata per la generazione di bollettini postali**
 
-Questa applicazione è stata sviluppata per semplificare e automatizzare la creazione di bollettini. 
+[![Electron](https://img.shields.io/badge/Electron-31.7.7-47848F?logo=electron)](https://www.electronjs.org/)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-Proprietary-red.svg)]()
+[![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows)](https://www.microsoft.com/windows)
 
-L'architettura ibrida si compone di:
-- **Frontend**: Un'applicazione desktop creata con **Electron**.
-- **Backend**: Uno script **Python** compilato in un eseguibile autonomo (`.exe`) tramite **PyInstaller**. Questo garantisce che la logica di business funzioni su qualsiasi macchina Windows, anche senza una versione di Python installata.
+[Caratteristiche](#-caratteristiche) •
+[Installazione](#-installazione) •
+[Utilizzo](#-utilizzo) •
+[Sviluppo](#-sviluppo) •
+[Release](#-release)
 
-## Tecnologie Utilizzate
+</div>
 
-| Componente | Tecnologia | Scopo |
-| :--- | :--- | :--- |
-| **Applicazione Desktop** | **Electron** | Framework per creare l'applicazione desktop. |
-| **Runtime Frontend** | **Node.js** | Ambiente per eseguire JavaScript e gestire le dipendenze. |
-| **Logica di Backend** | **Python** | Linguaggio per la logica di generazione dei documenti. |
-| **Packaging Backend** | **PyInstaller** | Compila lo script Python in un singolo eseguibile. |
-| **Packaging App** | **electron-builder**| Impacchetta l'applicazione Electron per la distribuzione. |
-| **Auto-Update** | **electron-updater** | Sistema di aggiornamenti automatici via GitHub Releases. |
-| **Gestione Dipendenze** | **NPM** | Gestore di pacchetti per le librerie JavaScript/Node.js. |
-| **Manipolazione Dati** | **Pandas** | Libreria Python per l'analisi e la manipolazione dei dati. |
-| **Interazione Web** | **Playwright** | Libreria per automatizzare le operazioni del browser. |
-| **Manipolazione PDF** | **PyMuPDF** | Libreria per l'estrazione di dati e la manipolazione di PDF. |
-| **Interazione Excel** | **Openpyxl** | Libreria per leggere e scrivere file Excel. |
+---
 
-## Installazione e Avvio
+## 📖 Descrizione
 
-### Prerequisiti
-- Node.js (versione LTS)
-- Python 3.8+
-- Git
+Generatore Bollettini è un'applicazione desktop che automatizza il processo di creazione di bollettini postali a partire da file Excel. L'applicazione combina un'interfaccia utente moderna costruita con Electron e un potente backend Python per l'elaborazione dei dati e la generazione dei documenti.
 
-### Setup iniziale
+### Architettura
+
+```
+┌─────────────────────────────────────┐
+│     Electron Frontend (UI)          │
+│  • Interfaccia utente moderna       │
+│  • Gestione file Excel              │
+│  • Progress tracking                │
+│  • Sistema auto-update              │
+└──────────────┬──────────────────────┘
+               │ IPC Communication
+┌──────────────▼──────────────────────┐
+│     Python Backend (Logic)          │
+│  • Elaborazione dati Excel          │
+│  • Generazione PDF                  │
+│  • Web scraping (Playwright)        │
+│  • Compilato in .exe standalone     │
+└─────────────────────────────────────┘
+```
+
+---
+
+## ✨ Caratteristiche
+
+### 🎯 Funzionalità Principali
+
+- **Elaborazione Batch**: Processa multiple causali da file Excel in automatico
+- **Generazione PDF**: Crea bollettini postali in formato PDF pronto per la stampa
+- **Web Automation**: Integrazione con portali web tramite Playwright
+- **CAPTCHA Handling**: Risoluzione interattiva dei CAPTCHA durante il processo
+- **Aggiornamenti Automatici**: Sistema di auto-update via GitHub Releases
+- **Interfaccia Moderna**: UI fluida con animazioni e feedback visivo
+
+### 🚀 Tecnologie
+
+| Componente | Tecnologia | Versione | Scopo |
+|:-----------|:-----------|:---------|:------|
+| **Desktop Framework** | Electron | 31.7.7 | Applicazione desktop cross-platform |
+| **Frontend Runtime** | Node.js | Latest LTS | Esecuzione JavaScript e gestione dipendenze |
+| **Backend Language** | Python | 3.12 | Logica business e elaborazione dati |
+| **Backend Packaging** | PyInstaller | 6.14.2 | Compilazione Python → .exe standalone |
+| **App Builder** | electron-builder | 25.1.8 | Creazione installer Windows |
+| **Auto-Update** | electron-updater | 6.6.2 | Sistema aggiornamenti automatici |
+| **Data Processing** | Pandas | 2.2.2 | Manipolazione dati Excel |
+| **Web Automation** | Playwright | Latest | Automazione browser headless |
+| **PDF Manipulation** | PyMuPDF | Latest | Estrazione e manipolazione PDF |
+| **Excel I/O** | Openpyxl | Latest | Lettura/scrittura file Excel |
+
+---
+
+## 📦 Installazione
+
+### Per Utenti Finali
+
+1. Scarica l'ultima versione da [GitHub Releases](../../releases)
+2. Esegui `GeneratoreBollettini-X.X.X-Setup.exe`
+3. Segui la procedura guidata di installazione
+4. L'app verificherà automaticamente gli aggiornamenti all'avvio
+
+### Per Sviluppatori
+
+#### Prerequisiti
+
+- **Node.js** 18+ (LTS)
+- **Python** 3.12+
+- **Git**
+- **Windows** 10/11
+
+#### Setup Ambiente di Sviluppo
+
 ```bash
-# Clona il repository
-git clone <repository-url>
+# 1. Clona il repository
+git clone https://github.com/ToseSenpai/bollettini.git
 cd bollettini
 
-# Installa dipendenze Node.js
+# 2. Installa dipendenze Node.js
 npm install
 
-# Installa dipendenze Python
-pip install -r requirements.txt
+# 3. Installa dipendenze Python (usa Python 3.12)
+py -3.12 -m pip install -r requirements.txt
 
-# Installa browser Playwright
-playwright install
+# 4. Installa browser Playwright
+py -3.12 -m playwright install chromium
 
-# Avvia l'applicazione
+# 5. Avvia in modalità sviluppo
 npm start
 ```
 
-## Build e Distribuzione
+---
 
-### Build per sviluppo
-```bash
-npm run build
-```
-Genera l'installer MSI nella cartella `dist/` senza pubblicare su GitHub.
+## 🎮 Utilizzo
 
-### Pubblicazione su GitHub Releases
-```bash
-npm run publish
-```
-Compila l'applicazione e pubblica automaticamente su GitHub Releases.
+### Interfaccia Utente
 
-### Processo di rilascio
+1. **Seleziona File Excel**: Clicca su "Seleziona File" e scegli il file Excel contenente le causali
+2. **Verifica Causali**: L'app mostrerà il numero di causali trovate
+3. **Avvia Processo**: Clicca "Avvia" per iniziare l'elaborazione
+4. **Monitoraggio**: Osserva la progress bar e i messaggi di stato
+5. **CAPTCHA**: Se richiesto, inserisci il codice CAPTCHA visualizzato
+6. **Completamento**: I bollettini PDF saranno salvati nella cartella specificata
 
-1. **Incrementa la versione** in `package.json`:
-   ```json
-   "version": "1.0.1"
-   ```
+### Configurazione
 
-2. **Esegui il build e pubblica**:
-   ```bash
-   npm run publish
-   ```
-
-3. **Crea una release su GitHub**:
-   - Vai su GitHub → Releases → Create a new release
-   - Tag: `v1.0.1` (deve corrispondere alla versione in package.json)
-   - Title: `Release v1.0.1`
-   - Carica il file `.msi` generato in `dist/` come asset
-
-4. **Le app installate riceveranno automaticamente la notifica** di aggiornamento disponibile.
-
-### Caratteristiche dell'installer
-
-- **Formato**: MSI (Microsoft Installer)
-- **Installazione**: Per utente singolo (no permessi amministratore richiesti)
-- **Directory**: `%LOCALAPPDATA%\Programs\Generatore Bollettini`
-- **Shortcut**: Desktop e Start Menu
-- **Lingua**: Italiano
-
-### Sistema di aggiornamenti automatici
-
-- **Controllo**: All'avvio dell'applicazione
-- **Notifica**: Banner nell'interfaccia quando disponibile un aggiornamento
-- **Download**: Automatico in background
-- **Installazione**: Un click per installare e riavviare
-- **Hosting**: GitHub Releases (gratuito)
-
-## Configurazione
-
-Il file `config.ini` contiene le credenziali e le impostazioni:
+Il file `config.ini` nella cartella di installazione contiene:
 
 ```ini
 [Credenziali]
@@ -113,11 +135,187 @@ CODICE_FISCALE = 04209680158
 EMAIL = itcustoms.mxbhub@dhl.com
 
 [Impostazioni]
-HEADLESS = true
+HEADLESS = true  # false per vedere il browser durante l'automazione
 ```
 
-## Note per gli sviluppatori
+---
 
-- **Certificato di code signing**: Quando disponibile, aggiungere `certificateFile` e `certificatePassword` nella sezione `win` di electron-builder per evitare l'avviso "Publisher Unknown"
-- **Testing**: Testare sempre l'installer e gli aggiornamenti prima del deploy aziendale
-- **Versioning**: Usare semantic versioning (es. 1.0.0, 1.0.1, 1.1.0)
+## 🛠️ Sviluppo
+
+### Struttura del Progetto
+
+```
+bollettini/
+├── main.js              # Main process Electron
+├── renderer.js          # Renderer process (UI logic)
+├── preload.js           # Preload script (IPC bridge)
+├── index.html           # UI HTML
+├── backend.py           # Backend Python
+├── backend.spec         # PyInstaller spec file
+├── config.ini           # Configuration file
+├── package.json         # Node dependencies & build config
+├── requirements.txt     # Python dependencies
+├── RELEASE_PROCESS.md   # Release workflow documentation
+└── dist/                # Build output (ignored in git)
+```
+
+### Script Disponibili
+
+```bash
+# Sviluppo
+npm start                    # Avvia app in dev mode
+npm run clean-build         # Pulisce cartelle build/dist
+
+# Build
+npm run build-backend       # Compila backend Python → .exe
+npm run build-backend-zip   # Build backend + crea backend.zip
+npm run build               # Build completo installer Windows
+npm run build-full          # Build backend + installer
+
+# Release (vedi RELEASE_PROCESS.md)
+npm run publish             # Build e pubblica su GitHub
+```
+
+### Debug
+
+- **DevTools**: Apri automaticamente all'avvio (configurabile in `main.js`)
+- **Logs Backend**: Visibili nella console DevTools
+- **Log Files**: Salvati in `%APPDATA%/bollettini/logs/`
+
+### Modificare la UI
+
+1. Modifica `index.html` per la struttura
+2. Modifica gli stili CSS inline o aggiungi file `.css`
+3. Modifica `renderer.js` per la logica UI
+4. Hot reload non disponibile - riavvia con `npm start`
+
+---
+
+## 🚢 Release
+
+### Processo di Release Completo
+
+Vedi [RELEASE_PROCESS.md](./RELEASE_PROCESS.md) per la guida dettagliata.
+
+#### Quick Start
+
+1. **Incrementa versione** in `package.json`:
+   ```json
+   {
+     "version": "1.0.3"
+   }
+   ```
+
+2. **Build backend e installer**:
+   ```bash
+   npm run build-backend-zip
+   npm run build
+   ```
+
+3. **Crea release su GitHub**:
+   - Tag: `v1.0.3`
+   - Carica da `dist/`:
+     - `GeneratoreBollettini-1.0.3-Setup.exe`
+     - `latest.yml`
+
+4. **Test**: Installa versione precedente e verifica auto-update
+
+### Sistema Auto-Update
+
+- ✅ **Controllo automatico** all'avvio
+- ✅ **Download in background** con progress bar
+- ✅ **Installazione one-click** con riavvio automatico
+- ✅ **Rollback** manuale reinstallando versione precedente
+- ✅ **Backend incluso** nell'installer (no download separato)
+
+---
+
+## 📋 Requisiti di Sistema
+
+### Minimi
+
+- **OS**: Windows 10 (64-bit)
+- **RAM**: 4 GB
+- **Disco**: 500 MB disponibili
+- **Connessione**: Internet (per aggiornamenti e web scraping)
+
+### Consigliati
+
+- **OS**: Windows 11 (64-bit)
+- **RAM**: 8 GB+
+- **Disco**: 1 GB disponibili
+- **Connessione**: Banda larga
+
+---
+
+## 🔒 Sicurezza
+
+- ✅ **Code Isolation**: Context isolation abilitato
+- ✅ **CSP**: Content Security Policy configurato
+- ✅ **No Remote Code**: Nessun codice remoto eseguito
+- ✅ **Secure IPC**: Comunicazione sicura main ↔ renderer
+- ⚠️ **Code Signing**: Non ancora implementato (TODO)
+
+---
+
+## 🐛 Troubleshooting
+
+### L'app non si avvia
+
+- Verifica che non ci siano altri processi Electron in esecuzione
+- Controlla i log in `%APPDATA%/bollettini/logs/`
+- Reinstalla l'applicazione
+
+### Errori durante l'elaborazione
+
+- Verifica che il file Excel sia nel formato corretto
+- Controlla la connessione internet
+- Verifica le credenziali in `config.ini`
+
+### Auto-update non funziona
+
+- Verifica la connessione internet
+- Controlla che la release su GitHub sia pubblica
+- Verifica che `latest.yml` sia presente nella release
+
+---
+
+## 🤝 Contribuire
+
+Questo è un progetto interno DHL. Per contribuire:
+
+1. Crea un branch per la tua feature: `git checkout -b feature/nome-feature`
+2. Commit delle modifiche: `git commit -m 'Add some feature'`
+3. Push al branch: `git push origin feature/nome-feature`
+4. Apri una Pull Request
+
+---
+
+## 📄 License
+
+Proprietario - DHL Express Italy
+Tutti i diritti riservati © 2025
+
+---
+
+## 👨‍💻 Autore
+
+**Simone Tosello** - Developer @ DHL Express Italy
+
+---
+
+## 🙏 Ringraziamenti
+
+- Team DHL per i requisiti e il testing
+- Electron community per il framework
+- Python community per le eccellenti librerie
+
+---
+
+<div align="center">
+
+**Made with ❤️ for DHL Express Italy**
+
+[⬆ Torna su](#-generatore-bollettini)
+
+</div>

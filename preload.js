@@ -8,8 +8,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onFileSelected: (callback) => ipcRenderer.on('excel-file-selected', (_event, value) => callback(value)),
   onPythonMessage: (callback) => ipcRenderer.on('from-python', (_event, value) => callback(value)),
   sendToPython: (data) => ipcRenderer.send('to-python', data),
-  
+
+  // API per versione app
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+
   // API per aggiornamenti
+  downloadUpdate: () => ipcRenderer.send('download-update'),
   installUpdate: () => ipcRenderer.send('install-update'),
   onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (_event, value) => callback(value)),
   onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', (_event, value) => callback(value)),

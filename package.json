@@ -1,23 +1,23 @@
 {
   "name": "bollettini",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Generatore di bollettini",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "npx electron .",
     "clean-build": "rimraf build dist backend",
     "build-backend": "npm run clean-build && pyinstaller --noconfirm backend.spec --distpath ./backend && copy config.ini backend\\backend",
-    "build-backend-zip": "npm run build-backend && powershell Compress-Archive -Path backend -DestinationPath backend.zip -Force",
+    "build-backend-zip": "npm run build-backend && node -e \"const pkg = require('./package.json'); require('fs').writeFileSync('backend/version.txt', pkg.version)\" && powershell Compress-Archive -Path backend -DestinationPath backend.zip -Force",
     "build": "electron-builder --win --publish never",
     "build-full": "npm run build-backend && electron-builder --win --publish never",
     "dist": "electron-builder --win --publish never",
     "publish": "electron-builder --win --publish always",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "DHL Express Italy",
+  "author": "Simone Tosello (DHL)",
   "license": "ISC",
   "devDependencies": {
-    "electron": "^31.2.1",
+    "electron": "^31.7.7",
     "electron-builder": "^25.1.8",
     "rimraf": "^6.0.1"
   },
@@ -26,7 +26,7 @@
   },
   "build": {
     "appId": "com.dhl.generatore-bollettini",
-    "productName": "Generatore Bollettini",
+    "productName": "GeneratoreBollettini",
     "directories": {
       "output": "dist"
     },
@@ -39,22 +39,35 @@
       "excel.png",
       "start.png",
       "config.ini",
+      "backend.zip",
       "node_modules/**/*"
     ],
     "win": {
-      "target": "msi",
+      "target": [
+        "nsis"
+      ],
       "artifactName": "${productName}-${version}-Setup.${ext}",
-      "icon": "logost.png"
+      "icon": "logost.png",
+      "requestedExecutionLevel": "highestAvailable"
     },
+    "asarUnpack": [
+      "backend.zip"
+    ],
     "msi": {
       "perMachine": false,
       "oneClick": false,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "shortcutName": "Generatore Bollettini"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
     },
     "publish": {
       "provider": "github",
-      "owner": "itose",
+      "owner": "ToseSenpai",
       "repo": "bollettini",
       "private": false
     }
