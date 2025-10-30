@@ -1,4 +1,6 @@
-<div align="center"> # 📋 Generatore Bollettini
+# 📋 Generatore Bollettini
+
+<div align="center"> 
 
 
 
