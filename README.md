@@ -293,7 +293,7 @@ Questo è un progetto interno DHL. Per contribuire:
 
 ## 📄 License
 
-Proprietario - DHL Express Italy
+Proprietario - Simone Tosello
 Tutti i diritti riservati © 2025
 
 ---
@@ -306,7 +306,7 @@ Tutti i diritti riservati © 2025
 
 ## 🙏 Ringraziamenti
 
-- Team DHL per i requisiti e il testing
+- Team MXPCUS DHL per il testing
 - Electron community per il framework
 - Python community per le eccellenti librerie
 
