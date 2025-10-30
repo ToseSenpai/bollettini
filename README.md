@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**Applicazione desktop automatizzata per la generazione di bollettini postali**
+**Applicazione desktop automatizzata per la generazione di bollettini sanitá**
 
 [![Electron](https://img.shields.io/badge/Electron-31.7.7-47848F?logo=electron)](https://www.electronjs.org/)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
@@ -50,7 +50,7 @@ Generatore Bollettini è un'applicazione desktop che automatizza il processo di 
 ### 🎯 Funzionalità Principali
 
 - **Elaborazione Batch**: Processa multiple causali da file Excel in automatico
-- **Generazione PDF**: Crea bollettini postali in formato PDF pronto per la stampa
+- **Generazione PDF**: Crea bollettini sanitá in formato PDF pronto per la stampa
 - **Web Automation**: Integrazione con portali web tramite Playwright
 - **CAPTCHA Handling**: Risoluzione interattiva dei CAPTCHA durante il processo
 - **Aggiornamenti Automatici**: Sistema di auto-update via GitHub Releases
