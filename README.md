@@ -314,7 +314,7 @@ Tutti i diritti riservati © 2025
 
 <div align="center">
 
-**Made with ❤️ for DHL Express Italy**
+**Made with ❤️ by ST for DHL Express Italy**
 
 [⬆ Torna su](#-generatore-bollettini)
 
