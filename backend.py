@@ -126,14 +126,34 @@ def run_automation(config_path, excel_path):
                 
                 # --- Estrazione e Salvataggio Codice Avviso ---
                 codice_avviso = extract_codice_avviso(final_filename)
+                send_message('info', f"Codice avviso estratto: {codice_avviso if codice_avviso else 'NON TROVATO'}")
+
                 if codice_avviso:
-                    idx = causali_df.index[causali_df[0] == causale].tolist()
+                    # Debug: mostra il DataFrame e i tipi
+                    send_message('info', f"Cerco causale '{causale}' (tipo: {type(causale).__name__})")
+                    send_message('info', f"Valori nel DataFrame colonna 0: {causali_df[0].tolist()}")
+                    send_message('info', f"Tipi nel DataFrame colonna 0: {causali_df[0].dtype}")
+
+                    # Converti entrambi a stringa e rimuovi spazi per confronto robusto
+                    causali_df[0] = causali_df[0].astype(str).str.strip()
+                    causale_str = str(causale).strip()
+
+                    idx = causali_df.index[causali_df[0] == causale_str].tolist()
+                    send_message('info', f"Indice trovato per causale '{causale_str}': {idx}")
+
                     if idx:
                         causali_df.loc[idx[0], 1] = codice_avviso
+                        send_message('info', f"Aggiornamento DataFrame per riga {idx[0]} con codice {codice_avviso}")
+
                         try:
                             causali_df.to_excel(excel_path, index=False, header=False)
+                            send_message('info', f"File Excel salvato con successo: {excel_path}")
                         except Exception as e:
                             send_message('error', f"Impossibile salvare Excel per '{causale}': {e}")
+                    else:
+                        send_message('warning', f"Causale '{causale}' non trovata nel DataFrame")
+                else:
+                    send_message('warning', f"Nessun codice avviso trovato nel PDF: {final_filename}")
             
             send_message('global_progress', 100)
             send_message('finished', f"Automazione completata. {total_causali} bollettini salvati e file Excel aggiornato.")

@@ -1,88 +1,161 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
-const { autoUpdater } = require('electron-updater');
 const fs = require('fs');
-const https = require('https');
-const { pipeline } = require('stream');
-const { promisify } = require('util');
-const pipelineAsync = promisify(pipeline);
 
-const isDev = !app.isPackaged;
+// Sposta la determinazione di isDev dopo che app è disponibile
+let isDev;
 let mainWindow;
 let pythonProcess;
+let autoUpdater; // Sarà inizializzato dopo che app è pronto
 
-// Configurazione per il download del backend
-const BACKEND_CONFIG = {
-    downloadUrl: 'https://github.com/itose/bollettini/releases/latest/download/backend.zip',
-    localPath: path.join(app.getPath('userData'), 'backend'),
-    zipPath: path.join(app.getPath('userData'), 'backend.zip'),
-    version: '1.0.0' // Versione del backend da scaricare
-};
+// Configurazione per il download del backend - sarà inizializzata dopo che app è pronto
+let BACKEND_CONFIG;
 
 // --- Gestione Backend Download ---
 
 /**
- * Verifica se il backend è già presente localmente
+ * Verifica se il backend è già presente localmente E della versione corretta
  */
 function isBackendAvailable() {
-    const backendExe = path.join(BACKEND_CONFIG.localPath, 'backend', 'backend.exe');
-    return fs.existsSync(backendExe);
+    // Verifica varie strutture possibili (dalla più probabile alla meno)
+    const possiblePaths = [
+        path.join(BACKEND_CONFIG.localPath, 'backend', 'backend', 'backend.exe'), // backend/backend/backend.exe
+        path.join(BACKEND_CONFIG.localPath, 'backend', 'backend.exe'), // backend/backend.exe (corretto!)
+        path.join(BACKEND_CONFIG.localPath, 'backend.exe') // backend.exe
+    ];
+    
+    let backendPath = null;
+    for (const testPath of possiblePaths) {
+        if (fs.existsSync(testPath)) {
+            backendPath = testPath;
+            console.log('Backend trovato in:', backendPath);
+            break;
+        }
+    }
+    
+    if (!backendPath) {
+        console.log('Backend non trovato in nessuno dei percorsi possibili');
+        return false;
+    }
+    
+    // Verifica la versione del backend
+    const versionFile = path.join(BACKEND_CONFIG.localPath, 'version.txt');
+    if (fs.existsSync(versionFile)) {
+        const installedVersion = fs.readFileSync(versionFile, 'utf8').trim();
+        console.log('Versione backend installata:', installedVersion);
+        console.log('Versione backend richiesta:', BACKEND_CONFIG.version);
+        
+        if (installedVersion === BACKEND_CONFIG.version) {
+            console.log('✓ Versione backend corretta');
+            return true;
+        } else {
+            console.log('✗ Versione backend non corretta, richiesto aggiornamento');
+            return false;
+        }
+    } else {
+        console.log('⚠ File version.txt non trovato, assumo backend vecchio');
+        return false;
+    }
 }
 
 /**
- * Scarica il backend da GitHub Releases
+ * Verifica se backend.zip è incluso nell'installer
  */
-async function downloadBackend() {
-    return new Promise((resolve, reject) => {
-        console.log('Inizio download backend...');
-        mainWindow.webContents.send('backend-download-start');
+function isBackendZipIncluded() {
+    if (isDev) {
+        const backendZipPath = path.join(__dirname, 'backend.zip');
+        return fs.existsSync(backendZipPath);
+    } else {
+        // In produzione, cerca in app.asar.unpacked
+        const possiblePaths = [
+            path.join(process.resourcesPath, 'app.asar.unpacked', 'backend.zip'),
+            path.join(process.resourcesPath, 'backend.zip')
+        ];
         
-        const file = fs.createWriteStream(BACKEND_CONFIG.zipPath);
-        
-        https.get(BACKEND_CONFIG.downloadUrl, (response) => {
-            if (response.statusCode !== 200) {
-                reject(new Error(`Download failed: ${response.statusCode}`));
-                return;
+        for (const zipPath of possiblePaths) {
+            if (fs.existsSync(zipPath)) {
+                console.log('Backend.zip trovato in:', zipPath);
+                return zipPath; // Ritorna il path per usarlo dopo
             }
-            
-            const totalSize = parseInt(response.headers['content-length'], 10);
-            let downloadedSize = 0;
-            
-            response.on('data', (chunk) => {
-                downloadedSize += chunk.length;
-                const progress = Math.round((downloadedSize / totalSize) * 100);
-                mainWindow.webContents.send('backend-download-progress', { progress, downloadedSize, totalSize });
-            });
-            
-            pipelineAsync(response, file)
-                .then(() => {
-                    console.log('Download completato');
-                    mainWindow.webContents.send('backend-download-complete');
-                    resolve();
-                })
-                .catch(reject);
-        }).on('error', reject);
-    });
+        }
+        return null;
+    }
 }
 
 /**
- * Estrae il backend scaricato
+ * Estrae il backend dall'installer
  */
-async function extractBackend() {
+async function extractBackend(zipFilePath = BACKEND_CONFIG.zipPath) {
     return new Promise((resolve, reject) => {
-        console.log('Estrazione backend...');
-        mainWindow.webContents.send('backend-extract-start');
+        console.log('Estrazione backend da:', zipFilePath);
+        console.log('Destinazione estrazione:', BACKEND_CONFIG.localPath);
+        mainWindow.webContents.send('from-python', { type: 'backend-extract-start', payload: 'Estrazione in corso...' });
+        
+        // Assicurati che la cartella di destinazione esista
+        if (!fs.existsSync(BACKEND_CONFIG.localPath)) {
+            fs.mkdirSync(BACKEND_CONFIG.localPath, { recursive: true });
+            console.log('Cartella di destinazione creata:', BACKEND_CONFIG.localPath);
+        }
         
         // Usa PowerShell per estrarre il ZIP
-        const process = spawn('powershell', ['-Command', `Expand-Archive -Path '${BACKEND_CONFIG.zipPath}' -DestinationPath '${BACKEND_CONFIG.localPath}' -Force`]);
+        const process = spawn('powershell', ['-Command', `Expand-Archive -Path '${zipFilePath}' -DestinationPath '${BACKEND_CONFIG.localPath}' -Force`]);
+        
+        let stdoutData = '';
+        process.stdout.on('data', (data) => {
+            stdoutData += data.toString();
+        });
+        
+        process.stderr.on('data', (data) => {
+            console.log('Stderr estrazione:', data.toString());
+        });
         
         process.on('close', (code) => {
+            console.log('Codice uscita estrazione:', code);
+            console.log('Output PowerShell:', stdoutData);
+            
             if (code === 0) {
-                console.log('Estrazione completata');
-                // Rimuovi il file ZIP dopo l'estrazione
-                fs.unlinkSync(BACKEND_CONFIG.zipPath);
-                mainWindow.webContents.send('backend-extract-complete');
+                console.log('Estrazione completata, verifica contenuti...');
+                // Lista il contenuto della cartella di destinazione
+                try {
+                    const contents = fs.readdirSync(BACKEND_CONFIG.localPath);
+                    console.log('Contenuto cartella destinazione:', contents);
+                    
+                    // Verifica ricorsivamente la struttura
+                    const checkStructure = (dir) => {
+                        const items = fs.readdirSync(dir);
+                        console.log('Contenuto:', dir, '->', items);
+                        items.forEach(item => {
+                            const fullPath = path.join(dir, item);
+                            const stat = fs.statSync(fullPath);
+                            if (stat.isDirectory()) {
+                                checkStructure(fullPath);
+                            } else if (item.endsWith('.exe')) {
+                                console.log('File .exe trovato:', fullPath);
+                            }
+                        });
+                    };
+                    checkStructure(BACKEND_CONFIG.localPath);
+                } catch (err) {
+                    console.error('Errore verifica contenuti:', err);
+                }
+                
+                // Rimuovi il file ZIP dopo l'estrazione (se esiste)
+                try {
+                    if (fs.existsSync(BACKEND_CONFIG.zipPath)) {
+                        fs.unlinkSync(BACKEND_CONFIG.zipPath);
+                        console.log('File ZIP rimosso');
+                    }
+                } catch (err) {
+                    console.log('Impossibile rimuovere ZIP:', err.message);
+                }
+                
+                // Scrivi il file di versione
+                const versionFile = path.join(BACKEND_CONFIG.localPath, 'version.txt');
+                fs.writeFileSync(versionFile, BACKEND_CONFIG.version);
+                console.log('Versione backend salvata:', BACKEND_CONFIG.version);
+                
+                mainWindow.webContents.send('from-python', { type: 'backend-extract-complete', payload: 'Estrazione completata' });
                 resolve();
             } else {
                 reject(new Error(`Estrazione fallita con codice ${code}`));
@@ -94,39 +167,81 @@ async function extractBackend() {
 }
 
 /**
- * Inizializza il backend (download se necessario)
+ * Inizializza il backend (estrazione da installer)
  */
 async function initializeBackend() {
     try {
-        if (isBackendAvailable()) {
-            console.log('Backend già presente');
-            return;
+        // In modalità sviluppo, usa Python direttamente
+        if (isDev) {
+            console.log('Modalità sviluppo: uso Python direttamente');
+            mainWindow.webContents.send('backend-status', 'Modalità sviluppo: Python disponibile');
+            return true;
         }
-        
-        console.log('Backend non trovato, avvio download...');
-        await downloadBackend();
-        await extractBackend();
-        console.log('Backend inizializzato con successo');
-        
+
+        // Verifica se il backend è già presente e valido
+        if (isBackendAvailable()) {
+            console.log('Backend già presente e verificato');
+            mainWindow.webContents.send('backend-status', 'Backend verificato e pronto');
+            return true;
+        }
+
+        // Il backend non è presente, estraiamolo dall'installer
+        console.log('Backend non trovato, estrazione da installer...');
+        mainWindow.webContents.send('backend-status', 'Estrazione backend...');
+
+        // Trova backend.zip incluso nell'installer
+        const includedBackendZip = isBackendZipIncluded();
+        if (!includedBackendZip) {
+            throw new Error('backend.zip non trovato nell\'installer. Reinstallare l\'applicazione.');
+        }
+
+        console.log('Trovato backend.zip nell\'installer, estrazione...');
+        const zipPath = isDev ? path.join(__dirname, 'backend.zip') : includedBackendZip;
+
+        // Estrai il backend
+        await extractBackend(zipPath);
+
+        // Verifica che l'estrazione sia riuscita
+        if (isBackendAvailable()) {
+            console.log('Backend estratto con successo');
+            mainWindow.webContents.send('backend-status', 'Backend pronto');
+            return true;
+        } else {
+            throw new Error('Backend estratto ma non trovato. Verifica l\'installazione.');
+        }
+
     } catch (error) {
         console.error('Errore durante l\'inizializzazione del backend:', error);
-        mainWindow.webContents.send('backend-error', error.message);
-        throw error;
+        mainWindow.webContents.send('backend-error', `Errore backend: ${error.message}`);
+        return false;
     }
 }
 
 function getBackendPath() {
     if (isDev) {
-        return { command: 'python', script: path.join(__dirname, 'backend.py') };
+        // Su Windows usa py launcher per Python 3.12
+        return { command: 'py', args: ['-3.12'], script: path.join(__dirname, 'backend.py') };
     }
-    // Usa il backend scaricato localmente
-    return { command: path.join(BACKEND_CONFIG.localPath, 'backend', 'backend.exe'), script: null };
+    // Usa il backend scaricato localmente - prova tutte le strutture possibili
+    let backendPath = path.join(BACKEND_CONFIG.localPath, 'backend', 'backend.exe');
+    if (!fs.existsSync(backendPath)) {
+        backendPath = path.join(BACKEND_CONFIG.localPath, 'backend', 'backend', 'backend.exe');
+        if (!fs.existsSync(backendPath)) {
+            backendPath = path.join(BACKEND_CONFIG.localPath, 'backend.exe');
+            if (!fs.existsSync(backendPath)) {
+                throw new Error('Backend non disponibile. Reinstallare l\'applicazione o contattare il supporto.');
+            }
+        }
+    }
+    return { command: backendPath, script: null };
 }
 
 function spawnBackendProcess(args) {
     const backend = getBackendPath();
     if (isDev) {
-        return spawn(backend.command, [backend.script, ...args]);
+        // Combina gli argomenti di Python con lo script e gli argomenti dell'applicazione
+        const pythonArgs = backend.args ? [...backend.args, backend.script, ...args] : [backend.script, ...args];
+        return spawn(backend.command, pythonArgs);
     }
     return spawn(backend.command, args);
 }
@@ -151,26 +266,38 @@ function createWindow() {
 
   mainWindow.loadFile('index.html');
   mainWindow.setMenu(null);
-  
-  // Opzionale: apri i DevTools per il debug
-  // mainWindow.webContents.openDevTools();
+
+  // Apri DevTools automaticamente per debug auto-update
+  mainWindow.webContents.openDevTools();
 }
 
 function countCausali(excelPath) {
-    const process = spawnBackendProcess(['--count-causali', excelPath]);
-    
-    process.stdout.on('data', (data) => {
-        try {
-            const parsed = JSON.parse(data.toString());
-            mainWindow.webContents.send('from-python', parsed);
-        } catch (e) {
-            console.error('Dati non-JSON (conteggio) da Python:', data.toString());
-        }
-    });
+    try {
+        const process = spawnBackendProcess(['--count-causali', excelPath]);
+        
+        process.stdout.on('data', (data) => {
+            try {
+                const parsed = JSON.parse(data.toString());
+                console.log('Risposta dal backend (conteggio):', parsed);
+                mainWindow.webContents.send('from-python', parsed);
+            } catch (e) {
+                console.error('Dati non-JSON (conteggio) da Python:', data.toString());
+            }
+        });
 
-    process.stderr.on('data', (data) => {
-        mainWindow.webContents.send('from-python', { type: 'error', payload: `Errore durante il conteggio: ${data}` });
-    });
+        process.stderr.on('data', (data) => {
+            console.error('Errore backend (conteggio):', data.toString());
+            mainWindow.webContents.send('from-python', { type: 'error', payload: `Errore durante il conteggio: ${data}` });
+        });
+        
+        process.on('error', (err) => {
+            console.error('Errore durante avvio backend (conteggio):', err);
+            mainWindow.webContents.send('from-python', { type: 'error', payload: `Errore durante l'avvio del backend: ${err.message}` });
+        });
+    } catch (err) {
+        console.error('Errore catturato in countCausali:', err);
+        mainWindow.webContents.send('from-python', { type: 'error', payload: `Errore durante il conteggio: ${err.message}` });
+    }
 }
 
 function startPythonBackend(excelPath) {
@@ -204,6 +331,76 @@ function startPythonBackend(excelPath) {
 }
 
 app.whenReady().then(async () => {
+  // Inizializza isDev dopo che app è pronto
+  isDev = !app.isPackaged;
+
+  // Inizializza autoUpdater solo dopo che app è pronto
+  autoUpdater = require('electron-updater').autoUpdater;
+
+  // Abilita download automatico ma mostriamo comunque un dialog all'utente
+  autoUpdater.autoDownload = true;
+
+  // Configura gli event listener di autoUpdater
+  autoUpdater.on('checking-for-update', () => {
+    console.log('Controllo aggiornamenti in corso...');
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('✅ Aggiornamento disponibile:', info.version);
+    console.log('Dettagli aggiornamento:', JSON.stringify(info, null, 2));
+    if (mainWindow) {
+      mainWindow.webContents.send('update-available', info);
+    } else {
+      console.error('❌ mainWindow non disponibile!');
+    }
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('ℹ️ Nessun aggiornamento disponibile');
+    console.log('Versione corrente:', app.getVersion());
+    console.log('Info:', JSON.stringify(info, null, 2));
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('Errore auto-updater:', err);
+    // Non inviare errori 404 al frontend (normal quando non ci sono release pubbliche)
+    if (!err.message || !err.message.includes('404')) {
+      if (mainWindow) mainWindow.webContents.send('update-error', err.message);
+    } else {
+      console.log('Auto-update non disponibile (nessuna release pubblica su GitHub)');
+    }
+  });
+
+  autoUpdater.on('download-progress', (progressObj) => {
+    let log_message = "📊 Download: " + Math.round(progressObj.percent) + '%';
+    log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+    console.log(log_message);
+
+    if (mainWindow) {
+      mainWindow.webContents.executeJavaScript(`console.log("${log_message}")`);
+      mainWindow.webContents.send('update-download-progress', progressObj);
+    }
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('✅ Aggiornamento scaricato:', info.version);
+    if (mainWindow) {
+      mainWindow.webContents.executeJavaScript(`console.log("✅ Aggiornamento scaricato completamente!")`);
+      mainWindow.webContents.send('update-downloaded', info);
+    }
+  });
+
+  // Inizializza BACKEND_CONFIG dopo che app è pronto
+  // Legge la versione da package.json per verifiche di compatibilità
+  const packageJson = require('./package.json');
+  const appVersion = packageJson.version;
+
+  BACKEND_CONFIG = {
+    localPath: path.join(app.getPath('userData'), 'backend'),
+    zipPath: path.join(app.getPath('userData'), 'backend.zip'),
+    version: appVersion // Versione sincronizzata con package.json
+  };
+
   createWindow();
   
   // Inizializza il backend (download se necessario)
@@ -214,9 +411,14 @@ app.whenReady().then(async () => {
     // L'app può continuare anche se il backend non è disponibile
   }
   
-  // Controlla aggiornamenti all'avvio (solo in produzione)
+  // Controlla aggiornamenti all'avvio (solo in produzione e solo se pubblicata)
   if (!isDev) {
-    checkForUpdates();
+    try {
+      checkForUpdates();
+    } catch (err) {
+      console.log('Auto-update non disponibile:', err.message);
+      // Non mostrare l'errore all'utente, è normale in sviluppo
+    }
   }
 
   app.on('activate', function () {
@@ -262,44 +464,51 @@ ipcMain.on('to-python', (event, data) => {
 // --- Gestione Auto-Update ---
 
 function checkForUpdates() {
-    console.log('Controllo aggiornamenti...');
-    
-    autoUpdater.checkForUpdatesAndNotify().catch(err => {
-        console.error('Errore durante il controllo aggiornamenti:', err);
-    });
+    const logToRenderer = (msg) => {
+        console.log(msg);
+        if (mainWindow) {
+            mainWindow.webContents.executeJavaScript(`console.log("${msg.replace(/"/g, '\\"')}")`);
+        }
+    };
+
+    logToRenderer('🔍 Controllo aggiornamenti...');
+    logToRenderer(`📦 Versione corrente: ${app.getVersion()}`);
+    logToRenderer(`🔧 isDev: ${isDev}`);
+    logToRenderer('📡 GitHub repo: ToseSenpai/bollettini');
+
+    // Verifica se siamo in un ambiente con auto-update configurato
+    try {
+        autoUpdater.checkForUpdates()
+            .then(result => {
+                logToRenderer(`✅ Check completato: ${JSON.stringify(result)}`);
+            })
+            .catch(err => {
+                logToRenderer(`❌ Errore nel controllo: ${err.message}`);
+                console.error('Stack:', err.stack);
+            });
+    } catch (err) {
+        logToRenderer(`❌ Auto-update non configurato: ${err.message}`);
+    }
 }
 
-// Eventi autoUpdater
-autoUpdater.on('checking-for-update', () => {
-    console.log('Controllo aggiornamenti in corso...');
-});
-
-autoUpdater.on('update-available', (info) => {
-    console.log('Aggiornamento disponibile:', info.version);
-    mainWindow.webContents.send('update-available', info);
-});
-
-autoUpdater.on('update-not-available', (info) => {
-    console.log('Nessun aggiornamento disponibile');
-});
-
-autoUpdater.on('error', (err) => {
-    console.error('Errore auto-updater:', err);
-    mainWindow.webContents.send('update-error', err.message);
-});
-
-autoUpdater.on('download-progress', (progressObj) => {
-    let log_message = "Velocità download: " + progressObj.bytesPerSecond;
-    log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
-    log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
-    console.log(log_message);
-    
-    mainWindow.webContents.send('update-download-progress', progressObj);
-});
-
-autoUpdater.on('update-downloaded', (info) => {
-    console.log('Aggiornamento scaricato:', info.version);
-    mainWindow.webContents.send('update-downloaded', info);
+// IPC per scaricare aggiornamento
+ipcMain.on('download-update', () => {
+    console.log('📥 IPC ricevuto: download-update');
+    if (mainWindow) {
+        mainWindow.webContents.executeJavaScript(`console.log("📥 Main process: Avvio download aggiornamento...")`);
+    }
+    try {
+        autoUpdater.downloadUpdate();
+        console.log('✅ downloadUpdate() chiamato');
+        if (mainWindow) {
+            mainWindow.webContents.executeJavaScript(`console.log("✅ downloadUpdate() chiamato con successo")`);
+        }
+    } catch (err) {
+        console.error('❌ Errore downloadUpdate():', err);
+        if (mainWindow) {
+            mainWindow.webContents.executeJavaScript(`console.error("❌ Errore downloadUpdate(): ${err.message}")`);
+        }
+    }
 });
 
 // IPC per installare aggiornamento
@@ -321,4 +530,9 @@ ipcMain.on('download-backend', async () => {
 ipcMain.on('check-backend', () => {
     const available = isBackendAvailable();
     mainWindow.webContents.send('backend-status', { available });
+});
+
+// IPC per ottenere la versione dell'app
+ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
 }); 

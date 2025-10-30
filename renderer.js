@@ -29,8 +29,8 @@ const updateInfo = document.getElementById('update-info');
 const updateProgressContainer = document.getElementById('update-progress-container');
 const updateProgress = document.getElementById('update-progress');
 const updateProgressText = document.getElementById('update-progress-text');
+const downloadUpdateBtn = document.getElementById('download-update-btn');
 const installUpdateBtn = document.getElementById('install-update-btn');
-const dismissUpdateBtn = document.getElementById('dismiss-update-btn');
 
 // Elementi per download backend
 const backendDownloadNotification = document.getElementById('backend-download-notification');
@@ -38,8 +38,10 @@ const backendDownloadInfo = document.getElementById('backend-download-info');
 const backendDownloadProgressContainer = document.getElementById('backend-download-progress-container');
 const backendDownloadProgress = document.getElementById('backend-download-progress');
 const backendDownloadProgressText = document.getElementById('backend-download-progress-text');
-const downloadBackendBtn = document.getElementById('download-backend-btn');
-const dismissBackendBtn = document.getElementById('dismiss-backend-btn');
+const backendExtractProgressContainer = document.getElementById('backend-extract-progress-container');
+const backendExtractProgress = document.getElementById('backend-extract-progress');
+const backendExtractProgressText = document.getElementById('backend-extract-progress-text');
+// Pulsanti backend rimossi (download automatico)
 
 let selectedFilePath = null;
 
@@ -86,17 +88,21 @@ startBtn.addEventListener('click', () => {
 });
 
 window.electronAPI.onPythonMessage((data) => {
+  console.log('Messaggio ricevuto dal backend:', data);
+  
   // Rimuove l'animazione da tutti gli elementi di stato prima di aggiornare
   // [mainStatus, currentTask].forEach(el => el.classList.remove('loading-animation'));
 
   switch (data.type) {
     case 'excel-file-selected':
+      console.log('File Excel selezionato:', data.payload);
       selectedFilePath = data.payload;
       filePathElement.textContent = `File: ${data.payload.split(/[\\/]/).pop()}`;
       // Non cambiare vista qui, attendi il conteggio
       break;
     
     case 'causali_count':
+      console.log('Conteggio causali ricevuto:', data.payload);
       if (data.payload.count > 0) {
         confirmStatus.textContent = `Trovate ${data.payload.count} causali.`;
         switchView(confirmView);
@@ -135,11 +141,118 @@ window.electronAPI.onPythonMessage((data) => {
       currentTask.textContent = data.payload;
       loadingAnimation.classList.add('hidden');
       break;
+    
+    case 'backend-status':
+      console.log('Status backend:', data.payload);
+      // Mostra nello status principale o in un elemento dedicato
+      if (initialView && !initialView.classList.contains('hidden')) {
+        // Mostra lo status backend nella vista iniziale
+        if (!document.getElementById('backend-status-display')) {
+          const statusDiv = document.createElement('div');
+          statusDiv.id = 'backend-status-display';
+          statusDiv.style.cssText = 'color: #4CAF50; font-size: 12px; margin-top: 10px; text-align: center;';
+          document.querySelector('#initial-view').appendChild(statusDiv);
+        }
+        document.getElementById('backend-status-display').textContent = data.payload;
+      }
+      break;
+    
+    case 'backend-error':
+      console.error('Errore backend:', data.payload);
+      errorLog.textContent = `Backend: ${data.payload}`;
+      hideBackendDownloadNotification();
+      break;
+    
+    case 'backend-warning':
+      console.warn('Warning backend:', data.payload);
+      if (initialView && !initialView.classList.contains('hidden')) {
+        if (!document.getElementById('backend-warning-display')) {
+          const warningDiv = document.createElement('div');
+          warningDiv.id = 'backend-warning-display';
+          warningDiv.style.cssText = 'color: #FF9800; font-size: 12px; margin-top: 10px; text-align: center;';
+          document.querySelector('#initial-view').appendChild(warningDiv);
+        }
+        document.getElementById('backend-warning-display').textContent = data.payload;
+      }
+      hideBackendDownloadNotification();
+      break;
+    
+    case 'backend-download-start':
+      console.log('Avvio download backend');
+      showBackendDownloadNotification();
+      backendDownloadInfo.textContent = data.payload || 'Inizio download...';
+      backendDownloadProgress.value = 0;
+      backendDownloadProgressText.textContent = '0%';
+      break;
+    
+    case 'backend-download-progress':
+      console.log('Progresso download:', data.payload);
+      if (data.payload && typeof data.payload.progress === 'number') {
+        backendDownloadProgress.value = data.payload.progress;
+        const mbDownloaded = (data.payload.downloadedSize / 1048576).toFixed(2);
+        const mbTotal = (data.payload.totalSize / 1048576).toFixed(2);
+        backendDownloadProgressText.textContent = `${data.payload.progress}% - ${mbDownloaded} MB / ${mbTotal} MB`;
+      }
+      break;
+    
+    case 'backend-download-complete':
+      console.log('Download completato');
+      backendDownloadInfo.textContent = 'Estrazione in corso...';
+      backendDownloadProgress.value = 100;
+      break;
+    
+    case 'backend-extract-start':
+      console.log('Inizio estrazione');
+      backendDownloadInfo.textContent = 'Estrazione componenti...';
+      backendDownloadProgressContainer.classList.add('hidden');
+      backendExtractProgressContainer.classList.remove('hidden');
+      // Simula progresso estrazione (non possiamo tracciare il progresso reale)
+      let extractProgress = 0;
+      const extractInterval = setInterval(() => {
+        extractProgress += 2;
+        if (extractProgress >= 90) {
+          clearInterval(extractInterval);
+          extractProgress = 90; // Ferma a 90% e aspetta il completamento
+        }
+        backendExtractProgress.value = extractProgress;
+        backendExtractProgressText.textContent = `${extractProgress}%`;
+      }, 200);
+      // Salva l'intervallo per pulirlo al completamento
+      window.extractInterval = extractInterval;
+      break;
+    
+    case 'backend-extract-complete':
+      console.log('Estrazione completata');
+      if (window.extractInterval) {
+        clearInterval(window.extractInterval);
+      }
+      backendExtractProgress.value = 100;
+      backendExtractProgressText.textContent = '100%';
+      backendDownloadInfo.textContent = 'Backend pronto!';
+      setTimeout(() => {
+        hideBackendDownloadNotification();
+      }, 2000);
+      break;
 
     case 'error':
       errorLog.textContent = `ERRORE: ${data.payload}`;
       mainStatus.textContent = "Processo Interrotto";
       loadingAnimation.classList.add('hidden');
+      break;
+
+    case 'info':
+      console.log('INFO:', data.payload);
+      // Mostra info nel task corrente (senza interrompere il flusso)
+      if (currentTask) {
+        currentTask.textContent = data.payload;
+      }
+      break;
+
+    case 'warning':
+      console.warn('WARNING:', data.payload);
+      // Mostra warning nell'error log ma in giallo
+      errorLog.style.color = '#FF9800';
+      errorLog.textContent = `⚠ ${data.payload}`;
       break;
   }
 });
@@ -179,9 +292,12 @@ document.addEventListener('drop', (event) => {
 
 // Mostra notifica aggiornamento
 function showUpdateNotification(version) {
-    updateInfo.textContent = `È disponibile la versione ${version}. Vuoi scaricarla ora?`;
+    updateInfo.textContent = `È disponibile la versione ${version}. Download in corso...`;
     updateNotification.classList.remove('hidden');
-    updateProgressContainer.classList.add('hidden');
+    updateProgressContainer.classList.remove('hidden'); // Mostra subito la barra
+    updateProgress.value = 0;
+    updateProgressText.textContent = '0%';
+    downloadUpdateBtn.classList.add('hidden'); // Nascondi il pulsante scarica
     installUpdateBtn.classList.add('hidden');
 }
 
@@ -193,6 +309,7 @@ function hideUpdateNotification() {
 // Mostra progresso download
 function showDownloadProgress(progress) {
     updateProgressContainer.classList.remove('hidden');
+    downloadUpdateBtn.classList.add('hidden');
     updateProgress.value = Math.round(progress.percent);
     updateProgressText.textContent = `${Math.round(progress.percent)}%`;
 }
@@ -201,6 +318,7 @@ function showDownloadProgress(progress) {
 function showInstallButton() {
     installUpdateBtn.classList.remove('hidden');
     updateProgressContainer.classList.add('hidden');
+    updateInfo.textContent = 'Aggiornamento scaricato! Clicca per installare.';
 }
 
 // Event listeners per aggiornamenti
@@ -216,7 +334,14 @@ window.electronAPI.onUpdateDownloaded((info) => {
 
 window.electronAPI.onUpdateError((error) => {
     console.error('Errore aggiornamento:', error);
-    errorLog.textContent = `Errore aggiornamento: ${error}`;
+    // Non mostrare errori di auto-update all'utente (sono normali quando non ci sono release pubbliche)
+    // Mostra solo nella console per debug
+    if (error && !error.toString().includes('404')) {
+        // Mostra solo errori non-404
+        errorLog.textContent = `Errore aggiornamento: ${error}`;
+    } else {
+        console.log('Auto-update non disponibile (nessuna release pubblica)');
+    }
 });
 
 window.electronAPI.onUpdateDownloadProgress((progress) => {
@@ -225,20 +350,30 @@ window.electronAPI.onUpdateDownloadProgress((progress) => {
 });
 
 // Pulsanti aggiornamento
-installUpdateBtn.addEventListener('click', () => {
-    window.electronAPI.installUpdate();
-});
+if (downloadUpdateBtn) {
+    downloadUpdateBtn.addEventListener('click', () => {
+        console.log('🔽 Download update button clicked');
+        window.electronAPI.downloadUpdate();
+    });
+} else {
+    console.error('❌ downloadUpdateBtn element not found!');
+}
 
-dismissUpdateBtn.addEventListener('click', () => {
-    hideUpdateNotification();
-});
+if (installUpdateBtn) {
+    installUpdateBtn.addEventListener('click', () => {
+        console.log('📥 Install update button clicked');
+        window.electronAPI.installUpdate();
+    });
+} else {
+    console.error('❌ installUpdateBtn element not found!');
+}
 
 // --- Gestione Download Backend ---
 
 // Mostra notifica download backend
 function showBackendDownloadNotification() {
     backendDownloadNotification.classList.remove('hidden');
-    backendDownloadProgressContainer.classList.add('hidden');
+    backendDownloadProgressContainer.classList.remove('hidden'); // Mostra sempre la barra
 }
 
 // Nasconde notifica download backend
@@ -305,14 +440,12 @@ window.electronAPI.onBackendStatus((status) => {
     }
 });
 
-// Pulsanti download backend
-downloadBackendBtn.addEventListener('click', () => {
-    window.electronAPI.downloadBackend();
-});
-
-dismissBackendBtn.addEventListener('click', () => {
-    hideBackendDownloadNotification();
-});
+// Pulsanti download backend rimossi (download automatico)
 
 // Controlla stato backend all'avvio
-window.electronAPI.checkBackend(); 
+window.electronAPI.checkBackend();
+
+// Mostra versione dell'app
+window.electronAPI.getAppVersion().then(version => {
+    document.getElementById('app-version').textContent = `v${version}`;
+}); 
