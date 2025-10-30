@@ -1,6 +1,6 @@
-# 📋 Generatore Bollettini
+<div align="center"> # 📋 Generatore Bollettini
 
-<div align="center">
+
 
 **Applicazione desktop automatizzata per la generazione di bollettini sanitá**
 
