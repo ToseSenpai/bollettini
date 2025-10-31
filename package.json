@@ -9,7 +9,7 @@
     "build-backend": "npm run clean-build && pyinstaller --noconfirm backend.spec --distpath ./backend && copy config.ini backend\\backend",
     "build-backend-zip": "npm run build-backend && node -e \"const pkg = require('./package.json'); require('fs').writeFileSync('backend/version.txt', pkg.version)\" && powershell Compress-Archive -Path backend -DestinationPath backend.zip -Force",
     "build": "electron-builder --win --publish never",
-    "build-full": "npm run build-backend && electron-builder --win --publish never",
+    "build-full": "npm run build-backend-zip && electron-builder --win --publish never",
     "dist": "electron-builder --win --publish never",
     "publish": "electron-builder --win --publish always",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -22,7 +22,9 @@
     "rimraf": "^6.0.1"
   },
   "dependencies": {
-    "electron-updater": "^6.6.2"
+    "electron-updater": "^6.6.2",
+    "extract-zip": "^2.0.1",
+    "node-stream-zip": "^1.15.0"
   },
   "build": {
     "appId": "com.dhl.generatore-bollettini",
@@ -40,6 +42,7 @@
       "start.png",
       "config.ini",
       "backend.zip",
+      "completion-icon.json",
       "node_modules/**/*"
     ],
     "win": {

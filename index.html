@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Generatore Bollettini</title>
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self'; style-src 'self' 'unsafe-inline';">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline';">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
     <style>
         :root {
             --bg-color-deep: #202020;
@@ -338,6 +339,51 @@
             user-select: none;
             -webkit-user-select: none;
         }
+        /* Completion view styles */
+        #completion-view {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        .completion-icon {
+            margin-bottom: 20px;
+        }
+        .completion-title {
+            font-size: 2em;
+            color: #28a745;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .completion-subtitle {
+            font-size: 1.2em;
+            color: var(--text-color-secondary);
+            margin-bottom: 30px;
+        }
+        .completion-stats {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px 40px;
+            margin-top: 20px;
+        }
+        .completion-count {
+            font-size: 3em;
+            font-weight: 700;
+            color: var(--accent-color);
+            line-height: 1;
+        }
+        .completion-label {
+            font-size: 1em;
+            color: var(--text-color-secondary);
+            margin-top: 8px;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .bounce-animation {
+            animation: bounce 1s ease-in-out 3;
+        }
     </style>
 </head>
 <body>
@@ -405,6 +451,19 @@
                 <input id="captcha-input" type="text" required autocomplete="off">
                 <label for="captcha-input">Scrivi qui il codice...</label>
                 <span class="focus-border"></span>
+            </div>
+        </div>
+
+        <!-- Schermata di Completamento -->
+        <div id="completion-view" class="view hidden">
+            <div class="completion-icon">
+                <div id="completion-icon" style="width:200px;height:200px;filter:invert(1) hue-rotate(180deg);"></div>
+            </div>
+            <h1 class="completion-title">Completato con Successo!</h1>
+            <p class="completion-subtitle">Tutti i bollettini sono stati elaborati correttamente</p>
+            <div class="completion-stats">
+                <div class="completion-count" id="completion-count">0</div>
+                <div class="completion-label">Bollettini completati</div>
             </div>
         </div>
 
