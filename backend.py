@@ -142,8 +142,13 @@ def run_automation(config_path, excel_path):
                     send_message('info', f"Indice trovato per causale '{causale_str}': {idx}")
 
                     if idx:
-                        causali_df.loc[idx[0], 1] = codice_avviso
-                        send_message('info', f"Aggiornamento DataFrame per riga {idx[0]} con codice {codice_avviso}")
+                        # Converti il codice avviso in int64 per compatibilità con pandas
+                        try:
+                            codice_avviso_int = int(codice_avviso)
+                            causali_df.loc[idx[0], 1] = codice_avviso_int
+                            send_message('info', f"Aggiornamento DataFrame per riga {idx[0]} con codice {codice_avviso}")
+                        except ValueError:
+                            send_message('warning', f"Impossibile convertire codice avviso '{codice_avviso}' in numero")
 
                         try:
                             causali_df.to_excel(excel_path, index=False, header=False)

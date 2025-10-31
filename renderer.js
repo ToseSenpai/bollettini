@@ -8,6 +8,7 @@ const initialView = document.getElementById('initial-view');
 const confirmView = document.getElementById('confirm-view');
 const progressView = document.getElementById('progress-view');
 const captchaView = document.getElementById('captcha-view');
+const completionView = document.getElementById('completion-view');
 
 const selectFileBtn = document.getElementById('select-file-btn');
 const startBtn = document.getElementById('start-btn');
@@ -22,6 +23,7 @@ const captchaImage = document.getElementById('captcha-image');
 const captchaInput = document.getElementById('captcha-input');
 const errorLog = document.getElementById('error-log');
 const loadingAnimation = document.getElementById('loading-animation-container');
+const completionCount = document.getElementById('completion-count');
 
 // Elementi per aggiornamenti
 const updateNotification = document.getElementById('update-notification');
@@ -47,7 +49,7 @@ let selectedFilePath = null;
 
 // Funzione per gestire il cambio di vista con animazioni
 function switchView(activeView) {
-    [initialView, confirmView, progressView, captchaView].forEach(view => {
+    [initialView, confirmView, progressView, captchaView, completionView].forEach(view => {
         if (view === activeView) {
             view.classList.remove('hidden');
         } else {
@@ -137,9 +139,47 @@ window.electronAPI.onPythonMessage((data) => {
       break;
       
     case 'finished':
-      mainStatus.textContent = "Completato con Successo!";
-      currentTask.textContent = data.payload;
+      // Nascondi l'animazione di caricamento
       loadingAnimation.classList.add('hidden');
+
+      // Estrai il conteggio dal payload (es: "Completati 25 bollettini")
+      let count = 0;
+      if (data.payload && typeof data.payload === 'string') {
+        const match = data.payload.match(/(\d+)/);
+        if (match) {
+          count = parseInt(match[1], 10);
+        }
+      } else if (typeof data.payload === 'number') {
+        count = data.payload;
+      }
+
+      // Anima il conteggio con effetto contatore
+      animateCounter(count);
+
+      // Passa alla schermata di completamento
+      setTimeout(() => {
+        switchView(completionView);
+        // Inizializza l'animazione Lottie dopo un breve ritardo
+        setTimeout(async () => {
+          const iconContainer = document.getElementById('completion-icon');
+          if (iconContainer && typeof lottie !== 'undefined') {
+            iconContainer.innerHTML = '';
+            try {
+              const response = await fetch('completion-icon.json');
+              const animationData = await response.json();
+              lottie.loadAnimation({
+                container: iconContainer,
+                renderer: 'svg',
+                loop: true,
+                autoplay: true,
+                animationData: animationData
+              });
+            } catch (error) {
+              console.error('Error loading Lottie animation:', error);
+            }
+          }
+        }, 300);
+      }, 500);
       break;
     
     case 'backend-status':
@@ -203,35 +243,37 @@ window.electronAPI.onPythonMessage((data) => {
     
     case 'backend-extract-start':
       console.log('Inizio estrazione');
+      showBackendDownloadNotification();
       backendDownloadInfo.textContent = 'Estrazione componenti...';
       backendDownloadProgressContainer.classList.add('hidden');
       backendExtractProgressContainer.classList.remove('hidden');
-      // Simula progresso estrazione (non possiamo tracciare il progresso reale)
-      let extractProgress = 0;
-      const extractInterval = setInterval(() => {
-        extractProgress += 2;
-        if (extractProgress >= 90) {
-          clearInterval(extractInterval);
-          extractProgress = 90; // Ferma a 90% e aspetta il completamento
-        }
-        backendExtractProgress.value = extractProgress;
-        backendExtractProgressText.textContent = `${extractProgress}%`;
-      }, 200);
-      // Salva l'intervallo per pulirlo al completamento
-      window.extractInterval = extractInterval;
+      backendExtractProgress.value = 0;
+      backendExtractProgressText.textContent = '0%';
       break;
-    
+
+    case 'backend-extract-progress':
+      // Aggiorna con il progresso reale
+      const { progress, current, total } = data.payload;
+      backendExtractProgress.value = progress;
+      backendExtractProgressText.textContent = `${progress}%`;
+      backendDownloadInfo.textContent = `Estrazione componenti... (${current}/${total})`;
+      console.log(`Progresso estrazione: ${progress}% (${current}/${total})`);
+      break;
+
     case 'backend-extract-complete':
       console.log('Estrazione completata');
-      if (window.extractInterval) {
-        clearInterval(window.extractInterval);
-      }
       backendExtractProgress.value = 100;
       backendExtractProgressText.textContent = '100%';
       backendDownloadInfo.textContent = 'Backend pronto!';
       setTimeout(() => {
         hideBackendDownloadNotification();
       }, 2000);
+      break;
+
+    case 'backend-extract-error':
+      console.error('Errore estrazione:', data.payload);
+      backendDownloadInfo.textContent = `Errore: ${data.payload}`;
+      backendExtractProgressContainer.classList.add('hidden');
       break;
 
     case 'error':
@@ -435,17 +477,49 @@ window.electronAPI.onBackendError((error) => {
 
 window.electronAPI.onBackendStatus((status) => {
     console.log('Stato backend:', status);
-    if (!status.available) {
+    // Mostra la notifica SOLO se il backend non è disponibile
+    // (status può essere un oggetto {available: boolean} oppure una stringa)
+    if (typeof status === 'object' && status.available === false) {
         showBackendDownloadNotification();
+    } else if (typeof status === 'object' && status.available === true) {
+        // Backend già disponibile, nascondi la notifica
+        hideBackendDownloadNotification();
     }
+    // Se status è una stringa, è solo un messaggio di log, non fare nulla con la UI
 });
 
 // Pulsanti download backend rimossi (download automatico)
-
-// Controlla stato backend all'avvio
-window.electronAPI.checkBackend();
+// Non è necessario controllare lo stato backend all'avvio perché initializeBackend()
+// viene chiamato automaticamente dal main process e invia gli eventi appropriati
 
 // Mostra versione dell'app
 window.electronAPI.getAppVersion().then(version => {
     document.getElementById('app-version').textContent = `v${version}`;
-}); 
+});
+
+// Funzione per animare il contatore dei bollettini completati
+function animateCounter(targetCount) {
+    const duration = 2000; // 2 secondi
+    const startTime = Date.now();
+    const startValue = 0;
+
+    function updateCounter() {
+        const currentTime = Date.now();
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        // Easing function (ease-out)
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        const currentValue = Math.floor(startValue + (targetCount - startValue) * easeOut);
+
+        completionCount.textContent = currentValue;
+
+        if (progress < 1) {
+            requestAnimationFrame(updateCounter);
+        } else {
+            completionCount.textContent = targetCount;
+        }
+    }
+
+    requestAnimationFrame(updateCounter);
+}
