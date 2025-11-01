@@ -1,10 +1,10 @@
 {
   "name": "bollettini",
-  "version": "1.0.2",
+  "version": "1.0.7",
   "description": "Generatore di bollettini",
   "main": "main.js",
   "scripts": {
-    "start": "npx electron .",
+    "start": "electron .",
     "clean-build": "rimraf build dist backend",
     "build-backend": "npm run clean-build && pyinstaller --noconfirm backend.spec --distpath ./backend && copy config.ini backend\\backend",
     "build-backend-zip": "npm run build-backend && node -e \"const pkg = require('./package.json'); require('fs').writeFileSync('backend/version.txt', pkg.version)\" && powershell Compress-Archive -Path backend -DestinationPath backend.zip -Force",
@@ -17,7 +17,7 @@
   "author": "Simone Tosello (DHL)",
   "license": "ISC",
   "devDependencies": {
-    "electron": "^31.7.7",
+    "electron": "^39.0.0",
     "electron-builder": "^25.1.8",
     "rimraf": "^6.0.1"
   },
@@ -43,6 +43,7 @@
       "config.ini",
       "backend.zip",
       "completion-icon.json",
+      "LegoDHL.json",
       "node_modules/**/*"
     ],
     "win": {

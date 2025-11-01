@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Generatore Bollettini</title>
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline';">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self' file: data:;">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
     <style>
         :root {
@@ -53,7 +53,9 @@
             width: auto;
         }
         .container {
-            width: 80%; max-width: 550px; padding: 40px;
+            width: 80%; max-width: 550px;
+            max-height: 85vh;
+            padding: 40px;
             background-color: var(--bg-color-surface);
             border: 1px solid var(--border-color);
             backdrop-filter: blur(20px);
@@ -63,6 +65,7 @@
             transition: all 0.4s ease;
             display: grid;
             place-items: center;
+            overflow-y: auto;
         }
         .view {
             grid-column: 1;
@@ -96,6 +99,34 @@
             visibility: hidden;
             pointer-events: none;
             transform: translate(-50%, -50%);
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(-45deg, #2b5876, #4e4376);
+            background-size: 400% 400%;
+            animation: gradient-animation 25s ease infinite;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .modal-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        /* Dialogo backend centrato nell'overlay */
+        #backend-download-notification {
+            position: relative;
+            top: auto;
+            left: auto;
+            transform: none;
+            z-index: 10000;
         }
         h1 { color: var(--text-color); font-weight: 600; }
         h2 { color: var(--accent-color); font-weight: 500;}
@@ -345,37 +376,58 @@
             flex-direction: column;
             align-items: center;
             text-align: center;
+            padding: 10px 0;
+            min-height: fit-content;
         }
         .completion-icon {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 10;
+        }
+        .completion-icon > div,
+        #completion-icon {
+            width: 120px !important;
+            height: 120px !important;
+            position: relative;
+            z-index: 11;
+        }
+        #completion-icon svg {
+            width: 100% !important;
+            height: 100% !important;
+            display: block !important;
         }
         .completion-title {
-            font-size: 2em;
+            font-size: 1.6em;
             color: #28a745;
             font-weight: 600;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
         .completion-subtitle {
-            font-size: 1.2em;
+            font-size: 1em;
             color: var(--text-color-secondary);
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
         .completion-stats {
             background: rgba(255, 255, 255, 0.05);
             border-radius: 12px;
-            padding: 20px 40px;
-            margin-top: 20px;
+            padding: 15px 30px;
+            margin-top: 10px;
         }
         .completion-count {
-            font-size: 3em;
+            font-size: 2.5em;
             font-weight: 700;
             color: var(--accent-color);
             line-height: 1;
         }
         .completion-label {
-            font-size: 1em;
+            font-size: 0.9em;
             color: var(--text-color-secondary);
-            margin-top: 8px;
+            margin-top: 6px;
         }
         @keyframes bounce {
             0%, 100% { transform: translateY(0); }
@@ -457,7 +509,7 @@
         <!-- Schermata di Completamento -->
         <div id="completion-view" class="view hidden">
             <div class="completion-icon">
-                <div id="completion-icon" style="width:200px;height:200px;filter:invert(1) hue-rotate(180deg);"></div>
+                <div id="completion-icon"></div>
             </div>
             <h1 class="completion-title">Completato con Successo!</h1>
             <p class="completion-subtitle">Tutti i bollettini sono stati elaborati correttamente</p>
@@ -487,24 +539,16 @@
             </div>
         </div>
         
-        <!-- Notifica Download Backend -->
-        <div id="backend-download-notification" class="modal-dialog hidden">
-            <h3 style="margin: 0 0 10px 0; color: var(--accent-color); font-size: 1.5em; text-align: center;">Download Backend</h3>
-            <p id="backend-download-info" style="margin: 0 0 20px 0; color: var(--text-color-secondary); font-size: 1em; text-align: center;">Scaricamento componenti necessari...</p>
-            <div id="backend-download-progress-container" style="margin-bottom: 20px;">
-                <div class="progress-label-container" style="margin-bottom: 8px;">
-                    <span class="progress-label">Download</span>
-                    <span id="backend-download-progress-text" class="progress-value">0%</span>
-                </div>
-                <progress id="backend-download-progress" value="0" max="100" style="width: 100%; height: 10px;"></progress>
-            </div>
-            <div id="backend-extract-progress-container" class="hidden" style="margin-bottom: 20px;">
-                <div class="progress-label-container" style="margin-bottom: 8px;">
-                    <span class="progress-label">Estrazione</span>
-                    <span id="backend-extract-progress-text" class="progress-value">In corso...</span>
-                </div>
-                <progress id="backend-extract-progress" value="0" max="100" style="width: 100%; height: 10px;"></progress>
-            </div>
+    </div>
+
+    <!-- Overlay per bloccare l'interfaccia durante estrazione backend -->
+    <div id="backend-overlay" class="modal-overlay hidden">
+        <!-- Notifica Download Backend (dentro l'overlay) -->
+        <div id="backend-download-notification" class="modal-dialog" style="background: transparent; border: none; box-shadow: none; backdrop-filter: none;">
+            <!-- Animazione Lottie -->
+            <div id="backend-lottie-animation" style="width: 200px; height: 200px; margin: 0 auto 20px;"></div>
+            <!-- Testo minimale -->
+            <p id="backend-loading-text" style="margin: 0; color: var(--text-color); font-size: 1.1em; text-align: center; font-weight: 500;">Inizializzazione applicazione...</p>
         </div>
     </div>
 

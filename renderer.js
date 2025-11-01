@@ -4,6 +4,50 @@
 // Qui puoi scrivere il codice JavaScript per l'interfaccia utente.
 console.log('Renderer script caricato.');
 
+// Mostra l'overlay di caricamento all'avvio in attesa del backend
+// Verrà nascosto quando arriva il messaggio backend-ready o backend-extract-complete
+document.addEventListener('DOMContentLoaded', async () => {
+    const backendOverlay = document.getElementById('backend-overlay');
+    // Mostra l'overlay all'avvio, verrà nascosto dal backend quando pronto
+    backendOverlay.classList.remove('hidden');
+    console.log('Overlay backend mostrato in attesa inizializzazione');
+
+    // Inizializza l'animazione Lottie per il caricamento backend
+    if (backendLottieContainer) {
+        try {
+            // Verifica che la libreria Lottie sia caricata
+            if (typeof lottie === 'undefined') {
+                console.error('Lottie library not loaded from CDN');
+                backendLottieContainer.innerHTML = '<div style="font-size:60px;text-align:center;">⏳</div>';
+                return;
+            }
+
+            console.log('Loading backend Lottie animation from LegoDHL.json...');
+            const response = await fetch('./LegoDHL.json');
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const animationData = await response.json();
+            console.log('Backend animation data loaded successfully');
+
+            backendLottieAnimation = lottie.loadAnimation({
+                container: backendLottieContainer,
+                renderer: 'svg',
+                loop: true,
+                autoplay: true,
+                animationData: animationData
+            });
+            console.log('Backend Lottie animation initialized');
+        } catch (error) {
+            console.error('Error loading backend Lottie animation:', error);
+            // Fallback: mostra un'icona statica
+            backendLottieContainer.innerHTML = '<div style="font-size:60px;text-align:center;">⏳</div>';
+        }
+    }
+});
+
 const initialView = document.getElementById('initial-view');
 const confirmView = document.getElementById('confirm-view');
 const progressView = document.getElementById('progress-view');
@@ -35,15 +79,13 @@ const downloadUpdateBtn = document.getElementById('download-update-btn');
 const installUpdateBtn = document.getElementById('install-update-btn');
 
 // Elementi per download backend
-const backendDownloadNotification = document.getElementById('backend-download-notification');
-const backendDownloadInfo = document.getElementById('backend-download-info');
-const backendDownloadProgressContainer = document.getElementById('backend-download-progress-container');
-const backendDownloadProgress = document.getElementById('backend-download-progress');
-const backendDownloadProgressText = document.getElementById('backend-download-progress-text');
-const backendExtractProgressContainer = document.getElementById('backend-extract-progress-container');
-const backendExtractProgress = document.getElementById('backend-extract-progress');
-const backendExtractProgressText = document.getElementById('backend-extract-progress-text');
+const backendOverlay = document.getElementById('backend-overlay');
+const backendLottieContainer = document.getElementById('backend-lottie-animation');
+const backendLoadingText = document.getElementById('backend-loading-text');
 // Pulsanti backend rimossi (download automatico)
+
+// Variabile per l'animazione Lottie
+let backendLottieAnimation = null;
 
 let selectedFilePath = null;
 
@@ -114,6 +156,16 @@ window.electronAPI.onPythonMessage((data) => {
       }
       break;
 
+    case 'column_b_not_empty':
+      console.warn('Validazione fallita: colonna B già compilata', data.payload);
+      const filledCount = data.payload.filled_count;
+      const filledRows = data.payload.filled_rows;
+      const rowsList = filledRows.length > 0 ? ` (righe: ${filledRows.join(', ')}${filledCount > 10 ? '...' : ''})` : '';
+      errorLog.textContent = `ERRORE: Il file selezionato ha già la colonna B compilata (${filledCount} ${filledCount === 1 ? 'riga' : 'righe'})${rowsList}.\n\nSeleziona un file nuovo con solo la colonna A (causali) compilata.`;
+      errorLog.style.color = '#f44336'; // Rosso per errore
+      switchView(initialView); // Torna alla vista iniziale
+      break;
+
     case 'main_status':
       mainStatus.textContent = data.payload;
       // mainStatus.classList.add('loading-animation');
@@ -162,11 +214,27 @@ window.electronAPI.onPythonMessage((data) => {
         // Inizializza l'animazione Lottie dopo un breve ritardo
         setTimeout(async () => {
           const iconContainer = document.getElementById('completion-icon');
-          if (iconContainer && typeof lottie !== 'undefined') {
+          if (iconContainer) {
             iconContainer.innerHTML = '';
+
+            // Verifica che la libreria Lottie sia caricata
+            if (typeof lottie === 'undefined') {
+              console.error('Lottie library not loaded from CDN');
+              iconContainer.innerHTML = '<div style="font-size:100px;text-align:center;line-height:200px;">✅</div>';
+              return;
+            }
+
             try {
-              const response = await fetch('completion-icon.json');
+              console.log('Loading Lottie animation from completion-icon.json...');
+              const response = await fetch('./completion-icon.json');
+
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+
               const animationData = await response.json();
+              console.log('Animation data loaded successfully');
+
               lottie.loadAnimation({
                 container: iconContainer,
                 renderer: 'svg',
@@ -174,9 +242,14 @@ window.electronAPI.onPythonMessage((data) => {
                 autoplay: true,
                 animationData: animationData
               });
+              console.log('Lottie animation initialized');
             } catch (error) {
               console.error('Error loading Lottie animation:', error);
+              // Fallback: mostra un'icona statica
+              iconContainer.innerHTML = '<div style="font-size:100px;text-align:center;line-height:200px;">✅</div>';
             }
+          } else {
+            console.error('completion-icon container not found');
           }
         }, 300);
       }, 500);
@@ -217,63 +290,29 @@ window.electronAPI.onPythonMessage((data) => {
       hideBackendDownloadNotification();
       break;
     
-    case 'backend-download-start':
-      console.log('Avvio download backend');
-      showBackendDownloadNotification();
-      backendDownloadInfo.textContent = data.payload || 'Inizio download...';
-      backendDownloadProgress.value = 0;
-      backendDownloadProgressText.textContent = '0%';
-      break;
-    
-    case 'backend-download-progress':
-      console.log('Progresso download:', data.payload);
-      if (data.payload && typeof data.payload.progress === 'number') {
-        backendDownloadProgress.value = data.payload.progress;
-        const mbDownloaded = (data.payload.downloadedSize / 1048576).toFixed(2);
-        const mbTotal = (data.payload.totalSize / 1048576).toFixed(2);
-        backendDownloadProgressText.textContent = `${data.payload.progress}% - ${mbDownloaded} MB / ${mbTotal} MB`;
-      }
-      break;
-    
-    case 'backend-download-complete':
-      console.log('Download completato');
-      backendDownloadInfo.textContent = 'Estrazione in corso...';
-      backendDownloadProgress.value = 100;
-      break;
-    
     case 'backend-extract-start':
-      console.log('Inizio estrazione');
+      console.log('Inizio estrazione backend');
       showBackendDownloadNotification();
-      backendDownloadInfo.textContent = 'Estrazione componenti...';
-      backendDownloadProgressContainer.classList.add('hidden');
-      backendExtractProgressContainer.classList.remove('hidden');
-      backendExtractProgress.value = 0;
-      backendExtractProgressText.textContent = '0%';
-      break;
-
-    case 'backend-extract-progress':
-      // Aggiorna con il progresso reale
-      const { progress, current, total } = data.payload;
-      backendExtractProgress.value = progress;
-      backendExtractProgressText.textContent = `${progress}%`;
-      backendDownloadInfo.textContent = `Estrazione componenti... (${current}/${total})`;
-      console.log(`Progresso estrazione: ${progress}% (${current}/${total})`);
+      backendLoadingText.textContent = 'Configurazione iniziale (solo alla prima installazione)...';
       break;
 
     case 'backend-extract-complete':
       console.log('Estrazione completata');
-      backendExtractProgress.value = 100;
-      backendExtractProgressText.textContent = '100%';
-      backendDownloadInfo.textContent = 'Backend pronto!';
       setTimeout(() => {
         hideBackendDownloadNotification();
-      }, 2000);
+        enableAllButtons(); // Riabilita tutti i pulsanti
+      }, 1500);
+      break;
+
+    case 'backend-ready':
+      // Il backend è già pronto (non serve estrazione)
+      console.log('Backend già disponibile:', data.payload);
+      hideBackendDownloadNotification();
       break;
 
     case 'backend-extract-error':
       console.error('Errore estrazione:', data.payload);
-      backendDownloadInfo.textContent = `Errore: ${data.payload}`;
-      backendExtractProgressContainer.classList.add('hidden');
+      backendLoadingText.textContent = `Errore: ${data.payload}`;
       break;
 
     case 'error':
@@ -414,83 +453,41 @@ if (installUpdateBtn) {
 
 // Mostra notifica download backend
 function showBackendDownloadNotification() {
-    backendDownloadNotification.classList.remove('hidden');
-    backendDownloadProgressContainer.classList.remove('hidden'); // Mostra sempre la barra
+    backendOverlay.classList.remove('hidden');
+    // L'animazione Lottie è già inizializzata e in loop
 }
 
 // Nasconde notifica download backend
 function hideBackendDownloadNotification() {
-    backendDownloadNotification.classList.add('hidden');
-}
-
-// Mostra progresso download backend
-function showBackendDownloadProgress(progress) {
-    backendDownloadProgressContainer.classList.remove('hidden');
-    backendDownloadProgress.value = progress.progress;
-    backendDownloadProgressText.textContent = `${progress.progress}%`;
-    
-    const downloadedMB = (progress.downloadedSize / (1024 * 1024)).toFixed(1);
-    const totalMB = (progress.totalSize / (1024 * 1024)).toFixed(1);
-    backendDownloadInfo.textContent = `Scaricamento: ${downloadedMB}MB / ${totalMB}MB`;
-}
-
-// Event listeners per download backend
-window.electronAPI.onBackendDownloadStart(() => {
-    console.log('Inizio download backend');
-    showBackendDownloadNotification();
-    backendDownloadInfo.textContent = 'Inizio download...';
-});
-
-window.electronAPI.onBackendDownloadProgress((progress) => {
-    console.log('Progresso download backend:', progress);
-    showBackendDownloadProgress(progress);
-});
-
-window.electronAPI.onBackendDownloadComplete(() => {
-    console.log('Download backend completato');
-    backendDownloadInfo.textContent = 'Estrazione in corso...';
-});
-
-window.electronAPI.onBackendExtractStart(() => {
-    console.log('Inizio estrazione backend');
-    backendDownloadInfo.textContent = 'Estrazione componenti...';
-});
-
-window.electronAPI.onBackendExtractComplete(() => {
-    console.log('Estrazione backend completata');
-    backendDownloadInfo.textContent = 'Backend pronto!';
-    setTimeout(() => {
-        hideBackendDownloadNotification();
-    }, 2000);
-});
-
-window.electronAPI.onBackendReady(() => {
-    console.log('Backend pronto');
-    hideBackendDownloadNotification();
-});
-
-window.electronAPI.onBackendError((error) => {
-    console.error('Errore backend:', error);
-    backendDownloadInfo.textContent = `Errore: ${error}`;
-    errorLog.textContent = `Errore backend: ${error}`;
-});
-
-window.electronAPI.onBackendStatus((status) => {
-    console.log('Stato backend:', status);
-    // Mostra la notifica SOLO se il backend non è disponibile
-    // (status può essere un oggetto {available: boolean} oppure una stringa)
-    if (typeof status === 'object' && status.available === false) {
-        showBackendDownloadNotification();
-    } else if (typeof status === 'object' && status.available === true) {
-        // Backend già disponibile, nascondi la notifica
-        hideBackendDownloadNotification();
+    backendOverlay.classList.add('hidden');
+    // Ferma l'animazione Lottie per risparmiare risorse
+    if (backendLottieAnimation) {
+        backendLottieAnimation.stop();
     }
-    // Se status è una stringa, è solo un messaggio di log, non fare nulla con la UI
-});
+}
 
-// Pulsanti download backend rimossi (download automatico)
-// Non è necessario controllare lo stato backend all'avvio perché initializeBackend()
-// viene chiamato automaticamente dal main process e invia gli eventi appropriati
+// L'overlay viene mostrato automaticamente all'avvio (vedi DOMContentLoaded)
+// e nascosto quando il backend è pronto (backend-ready o backend-extract-complete)
+
+// Funzione per disabilitare tutti i pulsanti dell'interfaccia
+function disableAllButtons() {
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(button => {
+        button.disabled = true;
+        button.style.opacity = '0.5';
+        button.style.cursor = 'not-allowed';
+    });
+}
+
+// Funzione per riabilitare tutti i pulsanti
+function enableAllButtons() {
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(button => {
+        button.disabled = false;
+        button.style.opacity = '1';
+        button.style.cursor = 'pointer';
+    });
+}
 
 // Mostra versione dell'app
 window.electronAPI.getAppVersion().then(version => {

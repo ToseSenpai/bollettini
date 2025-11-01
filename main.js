@@ -90,37 +90,42 @@ async function extractBackend(zipFilePath = BACKEND_CONFIG.zipPath) {
     return new Promise((resolve, reject) => {
         console.log('Estrazione backend da:', zipFilePath);
         console.log('Destinazione estrazione:', BACKEND_CONFIG.localPath);
-        mainWindow.webContents.send('from-python', { type: 'backend-extract-start', payload: 'Estrazione in corso...' });
-        
+
+        // Invia messaggio di inizio estrazione
+        if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('from-python', { type: 'backend-extract-start', payload: 'Estrazione in corso...' });
+        }
+
         // Assicurati che la cartella di destinazione esista
         if (!fs.existsSync(BACKEND_CONFIG.localPath)) {
             fs.mkdirSync(BACKEND_CONFIG.localPath, { recursive: true });
             console.log('Cartella di destinazione creata:', BACKEND_CONFIG.localPath);
         }
-        
+
         // Usa PowerShell per estrarre il ZIP
         const process = spawn('powershell', ['-Command', `Expand-Archive -Path '${zipFilePath}' -DestinationPath '${BACKEND_CONFIG.localPath}' -Force`]);
-        
+
         let stdoutData = '';
         process.stdout.on('data', (data) => {
             stdoutData += data.toString();
         });
-        
+
         process.stderr.on('data', (data) => {
             console.log('Stderr estrazione:', data.toString());
         });
-        
+
         process.on('close', (code) => {
             console.log('Codice uscita estrazione:', code);
             console.log('Output PowerShell:', stdoutData);
-            
+
             if (code === 0) {
                 console.log('Estrazione completata, verifica contenuti...');
+
                 // Lista il contenuto della cartella di destinazione
                 try {
                     const contents = fs.readdirSync(BACKEND_CONFIG.localPath);
                     console.log('Contenuto cartella destinazione:', contents);
-                    
+
                     // Verifica ricorsivamente la struttura
                     const checkStructure = (dir) => {
                         const items = fs.readdirSync(dir);
@@ -139,7 +144,7 @@ async function extractBackend(zipFilePath = BACKEND_CONFIG.zipPath) {
                 } catch (err) {
                     console.error('Errore verifica contenuti:', err);
                 }
-                
+
                 // Rimuovi il file ZIP dopo l'estrazione (se esiste)
                 try {
                     if (fs.existsSync(BACKEND_CONFIG.zipPath)) {
@@ -149,20 +154,33 @@ async function extractBackend(zipFilePath = BACKEND_CONFIG.zipPath) {
                 } catch (err) {
                     console.log('Impossibile rimuovere ZIP:', err.message);
                 }
-                
+
                 // Scrivi il file di versione
                 const versionFile = path.join(BACKEND_CONFIG.localPath, 'version.txt');
                 fs.writeFileSync(versionFile, BACKEND_CONFIG.version);
                 console.log('Versione backend salvata:', BACKEND_CONFIG.version);
-                
-                mainWindow.webContents.send('from-python', { type: 'backend-extract-complete', payload: 'Estrazione completata' });
-                resolve();
+
+                // Attendi un momento prima di completare
+                setTimeout(() => {
+                    if (mainWindow && mainWindow.webContents) {
+                        mainWindow.webContents.send('from-python', { type: 'backend-extract-complete', payload: 'Estrazione completata' });
+                    }
+                    resolve();
+                }, 500);
             } else {
+                if (mainWindow && mainWindow.webContents) {
+                    mainWindow.webContents.send('from-python', { type: 'backend-extract-error', payload: `Estrazione fallita con codice ${code}` });
+                }
                 reject(new Error(`Estrazione fallita con codice ${code}`));
             }
         });
-        
-        process.on('error', reject);
+
+        process.on('error', (err) => {
+            if (mainWindow && mainWindow.webContents) {
+                mainWindow.webContents.send('from-python', { type: 'backend-extract-error', payload: err.message });
+            }
+            reject(err);
+        });
     });
 }
 
@@ -174,20 +192,55 @@ async function initializeBackend() {
         // In modalità sviluppo, usa Python direttamente
         if (isDev) {
             console.log('Modalità sviluppo: uso Python direttamente');
-            mainWindow.webContents.send('backend-status', 'Modalità sviluppo: Python disponibile');
+            if (mainWindow && mainWindow.webContents) {
+                mainWindow.webContents.send('backend-status', 'Modalità sviluppo: Python disponibile');
+                // Aspetta che la pagina sia caricata prima di inviare backend-ready
+                if (mainWindow.webContents.isLoading()) {
+                    mainWindow.webContents.once('did-finish-load', () => {
+                        mainWindow.webContents.send('from-python', { type: 'backend-ready', payload: 'Backend pronto (dev mode)' });
+                    });
+                } else {
+                    mainWindow.webContents.send('from-python', { type: 'backend-ready', payload: 'Backend pronto (dev mode)' });
+                }
+            }
             return true;
         }
 
         // Verifica se il backend è già presente e valido
         if (isBackendAvailable()) {
             console.log('Backend già presente e verificato');
-            mainWindow.webContents.send('backend-status', 'Backend verificato e pronto');
+            if (mainWindow && mainWindow.webContents) {
+                mainWindow.webContents.send('backend-status', 'Backend verificato e pronto');
+                // Aspetta che la pagina sia caricata prima di inviare backend-ready
+                if (mainWindow.webContents.isLoading()) {
+                    mainWindow.webContents.once('did-finish-load', () => {
+                        mainWindow.webContents.send('from-python', { type: 'backend-ready', payload: 'Backend già disponibile' });
+                    });
+                } else {
+                    mainWindow.webContents.send('from-python', { type: 'backend-ready', payload: 'Backend già disponibile' });
+                }
+            }
             return true;
         }
 
-        // Il backend non è presente, estraiamolo dall'installer
-        console.log('Backend non trovato, estrazione da installer...');
-        mainWindow.webContents.send('backend-status', 'Estrazione backend...');
+        // Il backend non è presente o è obsoleto, estraiamolo dall'installer
+        console.log('Backend non trovato o versione obsoleta, preparazione estrazione...');
+
+        if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('backend-status', 'Aggiornamento backend...');
+        }
+
+        // Se esiste una vecchia installazione del backend, eliminala
+        if (fs.existsSync(BACKEND_CONFIG.localPath)) {
+            console.log('Rimozione backend obsoleto da:', BACKEND_CONFIG.localPath);
+            try {
+                fs.rmSync(BACKEND_CONFIG.localPath, { recursive: true, force: true });
+                console.log('Backend obsoleto rimosso con successo');
+            } catch (err) {
+                console.warn('Impossibile rimuovere completamente il backend obsoleto:', err.message);
+                // Continua comunque, l'estrazione potrebbe sovrascrivere
+            }
+        }
 
         // Trova backend.zip incluso nell'installer
         const includedBackendZip = isBackendZipIncluded();
@@ -401,11 +454,14 @@ app.whenReady().then(async () => {
     version: appVersion // Versione sincronizzata con package.json
   };
 
+  // Crea la finestra ma non la mostra ancora se il backend non è pronto
   createWindow();
-  
-  // Inizializza il backend (download se necessario)
+
+  // Inizializza il backend PRIMA di rendere l'app utilizzabile
   try {
+    console.log('Inizializzazione backend prima di mostrare l\'interfaccia...');
     await initializeBackend();
+    console.log('Backend inizializzato, interfaccia pronta');
   } catch (error) {
     console.error('Errore inizializzazione backend:', error);
     // L'app può continuare anche se il backend non è disponibile
