@@ -436,6 +436,14 @@
         .bounce-animation {
             animation: bounce 1s ease-in-out 3;
         }
+        /* Stile pulsante aggiornamento */
+        #install-update-btn:hover {
+            background-color: #218838 !important;
+        }
+        #install-update-btn:active {
+            background-color: #1e7e34 !important;
+            transform: scale(0.98);
+        }
     </style>
 </head>
 <body>
@@ -523,19 +531,15 @@
         <div id="error-log" style="color: #f87171; margin-top: 20px; min-height: 1.5em;"></div>
         
         <!-- Notifica Aggiornamento -->
-        <div id="update-notification" class="modal-dialog hidden">
-            <h3 style="margin: 0 0 10px 0; color: var(--accent-color); font-size: 1.5em; text-align: center;">Aggiornamento Disponibile</h3>
-            <p id="update-info" style="margin: 0 0 20px 0; color: var(--text-color-secondary); font-size: 1em; text-align: center;"></p>
-            <div id="update-progress-container" class="hidden" style="margin-bottom: 20px;">
-                <div class="progress-label-container" style="margin-bottom: 8px;">
-                    <span class="progress-label">Download</span>
-                    <span id="update-progress-text" class="progress-value">0%</span>
+        <div id="update-notification" class="modal-overlay hidden">
+            <div class="modal-dialog">
+                <h3 style="margin: 0 0 15px 0; color: var(--primary-color); font-size: 1.5em; text-align: center;">Aggiornamento Disponibile</h3>
+                <p id="update-info" style="margin: 0 0 20px 0; color: var(--text-color); font-size: 1.1em; text-align: center;"></p>
+                <div id="update-progress-container" class="hidden" style="margin-bottom: 20px;">
+                    <progress id="update-progress" value="0" max="100" style="width: 100%; height: 8px; margin-bottom: 10px;"></progress>
+                    <p id="update-progress-text" style="margin: 0; color: var(--text-color-secondary); font-size: 0.9em; text-align: center;">0%</p>
                 </div>
-                <progress id="update-progress" value="0" max="100" style="width: 100%; height: 10px;"></progress>
-            </div>
-            <div id="update-buttons" style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
-                <button id="download-update-btn" style="width: 100%; background-color: var(--accent-color); padding: 14px;">Scarica Ora</button>
-                <button id="install-update-btn" class="hidden" style="width: 100%; background-color: #28a745; padding: 14px;">Installa e Riavvia</button>
+                <button id="install-update-btn" class="hidden" style="width: 100%; background-color: #28a745; color: white; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-size: 1em; font-weight: 500; transition: background-color 0.2s;">Installa e Riavvia</button>
             </div>
         </div>
         

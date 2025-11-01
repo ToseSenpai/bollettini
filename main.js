@@ -448,6 +448,8 @@ app.whenReady().then(async () => {
   const packageJson = require('./package.json');
   const appVersion = packageJson.version;
 
+  console.log(`✅ Generatore Bollettini v${appVersion} avviato`);
+
   BACKEND_CONFIG = {
     localPath: path.join(app.getPath('userData'), 'backend'),
     zipPath: path.join(app.getPath('userData'), 'backend.zip'),
