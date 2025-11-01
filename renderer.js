@@ -75,7 +75,6 @@ const updateInfo = document.getElementById('update-info');
 const updateProgressContainer = document.getElementById('update-progress-container');
 const updateProgress = document.getElementById('update-progress');
 const updateProgressText = document.getElementById('update-progress-text');
-const downloadUpdateBtn = document.getElementById('download-update-btn');
 const installUpdateBtn = document.getElementById('install-update-btn');
 
 // Elementi per download backend
@@ -373,12 +372,11 @@ document.addEventListener('drop', (event) => {
 
 // Mostra notifica aggiornamento
 function showUpdateNotification(version) {
-    updateInfo.textContent = `È disponibile la versione ${version}. Download in corso...`;
+    updateInfo.textContent = `Versione ${version}`;
     updateNotification.classList.remove('hidden');
     updateProgressContainer.classList.remove('hidden'); // Mostra subito la barra
     updateProgress.value = 0;
-    updateProgressText.textContent = '0%';
-    downloadUpdateBtn.classList.add('hidden'); // Nascondi il pulsante scarica
+    updateProgressText.textContent = 'Download in corso...';
     installUpdateBtn.classList.add('hidden');
 }
 
@@ -390,7 +388,6 @@ function hideUpdateNotification() {
 // Mostra progresso download
 function showDownloadProgress(progress) {
     updateProgressContainer.classList.remove('hidden');
-    downloadUpdateBtn.classList.add('hidden');
     updateProgress.value = Math.round(progress.percent);
     updateProgressText.textContent = `${Math.round(progress.percent)}%`;
 }
@@ -399,7 +396,7 @@ function showDownloadProgress(progress) {
 function showInstallButton() {
     installUpdateBtn.classList.remove('hidden');
     updateProgressContainer.classList.add('hidden');
-    updateInfo.textContent = 'Aggiornamento scaricato! Clicca per installare.';
+    updateInfo.textContent = 'Download completato';
 }
 
 // Event listeners per aggiornamenti
@@ -430,16 +427,7 @@ window.electronAPI.onUpdateDownloadProgress((progress) => {
     showDownloadProgress(progress);
 });
 
-// Pulsanti aggiornamento
-if (downloadUpdateBtn) {
-    downloadUpdateBtn.addEventListener('click', () => {
-        console.log('🔽 Download update button clicked');
-        window.electronAPI.downloadUpdate();
-    });
-} else {
-    console.error('❌ downloadUpdateBtn element not found!');
-}
-
+// Pulsante installa aggiornamento
 if (installUpdateBtn) {
     installUpdateBtn.addEventListener('click', () => {
         console.log('📥 Install update button clicked');
