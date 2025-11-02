@@ -30,5 +30,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onBackendExtractComplete: (callback) => ipcRenderer.on('backend-extract-complete', (_event) => callback()),
   onBackendReady: (callback) => ipcRenderer.on('backend-ready', (_event) => callback()),
   onBackendError: (callback) => ipcRenderer.on('backend-error', (_event, value) => callback(value)),
-  onBackendStatus: (callback) => ipcRenderer.on('backend-status', (_event, value) => callback(value))
+  onBackendStatus: (callback) => ipcRenderer.on('backend-status', (_event, value) => callback(value)),
+  onBackendInitializing: (callback) => ipcRenderer.on('backend-initializing', (_event, value) => callback(value))
 }); 

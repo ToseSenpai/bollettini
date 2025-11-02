@@ -142,13 +142,9 @@ def run_automation(config_path, excel_path):
                     send_message('info', f"Indice trovato per causale '{causale_str}': {idx}")
 
                     if idx:
-                        # Converti il codice avviso in int64 per compatibilità con pandas
-                        try:
-                            codice_avviso_int = int(codice_avviso)
-                            causali_df.loc[idx[0], 1] = codice_avviso_int
-                            send_message('info', f"Aggiornamento DataFrame per riga {idx[0]} con codice {codice_avviso}")
-                        except ValueError:
-                            send_message('warning', f"Impossibile convertire codice avviso '{codice_avviso}' in numero")
+                        # Salva il codice avviso come stringa per evitare problemi con numeri grandi
+                        causali_df.loc[idx[0], 1] = str(codice_avviso)
+                        send_message('info', f"Aggiornamento DataFrame per riga {idx[0]} con codice {codice_avviso}")
 
                         try:
                             causali_df.to_excel(excel_path, index=False, header=False)
@@ -168,15 +164,45 @@ def run_automation(config_path, excel_path):
 
 def load_causali_from_excel(file_path):
     try:
+        # Leggi Excel senza specificare dtype (lo impostiamo dopo)
         df = pd.read_excel(file_path, header=None, engine='openpyxl')
-        if df.shape[1] == 1:
+
+        # VALIDAZIONE: Controlla se la colonna B (index 1) è già compilata
+        # Controllo PRIMA di creare la colonna se non esiste
+        if df.shape[1] >= 2:
+            # Il file ha almeno 2 colonne
+            # Conta quante righe hanno dati nella colonna B (index 1)
+            filled_count = 0
+            filled_rows = []
+
+            for idx, val in df[1].items():
+                # Controlla se il valore NON è NaN/None E non è stringa vuota
+                if pd.notna(val) and str(val).strip() != '':
+                    filled_count += 1
+                    filled_rows.append(idx)
+
+            if filled_count > 0:
+                # Invia messaggio di errore con dettagli
+                send_message('column_b_not_empty', {
+                    'filled_count': int(filled_count),
+                    'filled_rows': [int(r) + 1 for r in filled_rows[:10]]  # Prime 10 righe (1-indexed)
+                })
+                return None, None
+
+            # Assicurati che la colonna 1 sia sempre object/string per evitare problemi con numeri grandi
+            df[1] = df[1].astype('object')
+        else:
+            # Il file ha solo 1 colonna, creane una seconda vuota
             df[1] = None
+
         causali = df.iloc[:, 0].dropna().astype(str).tolist()
         return df, causali
     except Exception as e:
         # Invece di mandare un errore, che chiuderebbe il processo,
         # mandiamo un messaggio specifico gestibile dal frontend.
-        send_message('error', f"Errore lettura Excel: {e}")
+        import traceback
+        error_details = traceback.format_exc()
+        send_message('error', f"Errore lettura Excel: {e}\n\nDettagli:\n{error_details}")
         return None, None
 
 def extract_codice_avviso(pdf_path):
@@ -214,8 +240,12 @@ if __name__ == '__main__':
         if mode == '--count-causali':
             excel_file = sys.argv[2]
             _, causali_list = load_causali_from_excel(excel_file)
-            count = len(causali_list) if causali_list is not None else 0
-            send_message('causali_count', {'count': count})
+
+            # Se causali_list è None, significa che la validazione è fallita
+            # Il messaggio di errore è già stato inviato da load_causali_from_excel
+            if causali_list is not None:
+                count = len(causali_list)
+                send_message('causali_count', {'count': count})
         
         elif mode == '--run-automation':
             config_file = 'config.ini'
