@@ -7,28 +7,113 @@ import pandas as pd
 import fitz  # PyMuPDF
 import re
 import json
+import time
+from datetime import datetime
 
 def send_message(msg_type, payload):
     """Invia un messaggio JSON a stdout."""
     print(json.dumps({"type": msg_type, "payload": payload}))
     sys.stdout.flush()
 
+def log_with_timestamp(message):
+    """Log con timestamp per debugging."""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    send_message('info', f"[{timestamp}] {message}")
+
 def run_automation(config_path, excel_path):
     from playwright.sync_api import sync_playwright, Page
 
-    def wait_for_loading_spinner_to_disappear(page: Page):
+    def wait_for_loading_spinner_to_disappear(page: Page, timeout=60000):
         """Sposta questa funzione qui dentro perché dipende da Page."""
         text_spinner = page.locator(".spinner-text:has-text('Attendere...')")
         visual_spinner = page.locator(".la-ball-clip-rotate")
-        text_spinner.wait_for(state='hidden', timeout=60000)
-        visual_spinner.wait_for(state='hidden', timeout=60000)
+        text_spinner.wait_for(state='hidden', timeout=timeout)
+        visual_spinner.wait_for(state='hidden', timeout=timeout)
+
+    def wait_for_selector_with_retry(page: Page, selector, timeout, max_retry, wait_after_spinner, is_critical=False):
+        """
+        Attende un selettore con retry logic e exponential backoff.
+
+        Args:
+            page: Pagina Playwright
+            selector: Selettore CSS da attendere
+            timeout: Timeout in millisecondi per ogni tentativo
+            max_retry: Numero massimo di tentativi
+            wait_after_spinner: Delay in secondi dopo operazioni di attesa
+            is_critical: Se True, usa timeout esteso per selettori critici
+
+        Returns:
+            True se il selettore è stato trovato, altrimenti solleva eccezione
+        """
+        for attempt in range(1, max_retry + 1):
+            try:
+                log_with_timestamp(f"Tentativo {attempt}/{max_retry} per selettore '{selector}'")
+
+                # Attende che non ci siano più richieste di rete in corso
+                try:
+                    page.wait_for_load_state('networkidle', timeout=30000)
+                    log_with_timestamp("Stato 'networkidle' raggiunto")
+                except Exception as e:
+                    log_with_timestamp(f"Timeout networkidle (continuo comunque): {e}")
+
+                # Piccolo delay aggiuntivo
+                if wait_after_spinner > 0:
+                    log_with_timestamp(f"Attesa addizionale di {wait_after_spinner}s dopo spinner...")
+                    time.sleep(wait_after_spinner)
+
+                # Tenta di trovare il selettore
+                page.wait_for_selector(selector, state="visible", timeout=timeout)
+                log_with_timestamp(f"Selettore '{selector}' trovato con successo al tentativo {attempt}")
+                return True
+
+            except Exception as e:
+                log_with_timestamp(f"Tentativo {attempt} fallito per '{selector}': {str(e)}")
+
+                if attempt < max_retry:
+                    # Exponential backoff: 2s, 4s, 8s...
+                    backoff_time = 2 ** attempt
+                    log_with_timestamp(f"Attesa di {backoff_time}s prima del prossimo tentativo...")
+                    time.sleep(backoff_time)
+
+                    # Al secondo tentativo, prova a fare screenshot per debugging
+                    if attempt == 2:
+                        try:
+                            os.makedirs("logs", exist_ok=True)
+                            screenshot_path = f"logs/error_screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                            page.screenshot(path=screenshot_path)
+                            log_with_timestamp(f"Screenshot salvato in: {screenshot_path}")
+                        except Exception as screenshot_error:
+                            log_with_timestamp(f"Impossibile salvare screenshot: {screenshot_error}")
+                else:
+                    # Ultimo tentativo fallito, solleva l'eccezione
+                    error_msg = f"Timeout definitivo dopo {max_retry} tentativi per selettore '{selector}': {str(e)}"
+                    log_with_timestamp(error_msg)
+
+                    # Screenshot finale
+                    try:
+                        os.makedirs("logs", exist_ok=True)
+                        screenshot_path = f"logs/final_error_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                        page.screenshot(path=screenshot_path)
+                        log_with_timestamp(f"Screenshot finale salvato in: {screenshot_path}")
+                    except:
+                        pass
+
+                    raise Exception(error_msg)
     
     try:
         config = configparser.ConfigParser()
         # Usa il percorso corretto per config.ini
         actual_config_path = get_resource_path(config_path)
         config.read(actual_config_path)
-        
+
+        # Carica le impostazioni di timeout e retry dalla config
+        timeout_default = config['Impostazioni'].getint('TIMEOUT_DEFAULT', 120000)
+        timeout_critico = config['Impostazioni'].getint('TIMEOUT_SELETTORE_CRITICO', 180000)
+        max_retry = config['Impostazioni'].getint('MAX_RETRY', 3)
+        wait_after_spinner = config['Impostazioni'].getint('WAIT_AFTER_SPINNER', 2)
+
+        log_with_timestamp(f"Configurazione caricata - Timeout default: {timeout_default}ms, Timeout critico: {timeout_critico}ms, Max retry: {max_retry}")
+
         causali_df, causali_list = load_causali_from_excel(excel_path)
         if not causali_list:
             send_message('error', "Nessuna causale trovata nel file Excel.")
@@ -41,7 +126,8 @@ def run_automation(config_path, excel_path):
                 accept_downloads=True
             )
             page = context.new_page()
-            page.set_default_timeout(60000)
+            page.set_default_timeout(timeout_default)
+            log_with_timestamp(f"Browser avviato, timeout default impostato a {timeout_default}ms")
 
             # --- LOGIN ---
             send_message('main_status', "Login in corso...")
@@ -91,13 +177,16 @@ def run_automation(config_path, excel_path):
 
                 send_message('task_progress', 50)
                 page.get_by_role("row", name="MER-Controllo merci in importazione").get_by_role("button", name="Seleziona").click()
-                wait_for_loading_spinner_to_disappear(page)
-                
+                wait_for_loading_spinner_to_disappear(page, timeout=timeout_default)
+
                 send_message('task_progress', 70)
-                page.wait_for_selector("#codiceTariffa", state="visible")
+                log_with_timestamp("Inizio attesa per selettore critico #codiceTariffa")
+                # Usa la funzione con retry per il selettore critico #codiceTariffa
+                wait_for_selector_with_retry(page, "#codiceTariffa", timeout_critico, max_retry, wait_after_spinner, is_critical=True)
+                log_with_timestamp("Selettore #codiceTariffa trovato, procedo con il fill")
                 page.locator("#codiceTariffa").fill("17")
                 page.get_by_role("button", name="Ricerca").click()
-                wait_for_loading_spinner_to_disappear(page)
+                wait_for_loading_spinner_to_disappear(page, timeout=timeout_default)
 
                 target_row = page.get_by_role("row").filter(has_text="SMAF_MER17 - U. T. MILANO MALPENSA")
                 target_row.get_by_role("checkbox").click()

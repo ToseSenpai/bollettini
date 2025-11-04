@@ -26,6 +26,7 @@ dist/
 
 # User-specific files
 /downloads/
+/logs/
 NOTE_DEPLOYMENT.md
 
 # Temporary documentation files
